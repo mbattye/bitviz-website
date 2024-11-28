@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bitcoin Network Metrics</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #94a3b8;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .title {
+            font-size: 1.5rem;
+            color: #94a3b8;
+            margin-bottom: 2rem;
+            transition: color 0.2s ease;
+        }
+
+        .title:hover {
+            color: #f7931a;
+            cursor: pointer;
+        }
+
+        .metrics-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .metric-card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: transform 0.2s ease;
+            position: relative;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .time-range-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .time-button {
+            background: #1e293b;
+            border: 1px solid #94a3b8;
+            color: #94a3b8;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.8rem;
+        }
+
+        .time-button:hover {
+            border-color: #f7931a;
+            color: #f7931a;
+        }
+
+        .time-button.active {
+            background: #f7931a;
+            border-color: #f7931a;
+            color: #0f172a;
+        }
+
+        .visualization {
+            width: 100%;
+        }
+
+        .visualization.users-viz {
+            height: 170px;
+        }
+
+        .visualization.miners-viz {
+            height: 400px;
+        }
+
+        .visualization.nodes-viz {
+            height: 900px;
+        }
+
+        .area-path {
+            fill: #f7931a;
+            fill-opacity: 0.2;
+            stroke: #f7931a;
+            stroke-width: 2;
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 8px;
+            background: #334155;
+            border-radius: 4px;
+            color: #94a3b8;
+            font-size: 0.875rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .visualization svg {
+            border: none;
+        }
+
+        .x-axis text, .y-axis text {
+            font-size: 14px;
+        }
+
+        .treemap-cell {
+            stroke: #0f172a;
+            stroke-width: 1px;
+            transition: opacity 0.2s;
+        }
+
+        .treemap-cell:hover {
+            opacity: 0.8;
+        }
+
+        .treemap-label {
+            font-size: 12px;
+            fill: #fff;
+            pointer-events: none;
+        }
+
+        .metric-card.users {
+            height: 250px;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card.miners {
+            height: 500px;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card.nodes {
+            height: 1000px;
+        }
+
+        .metric-card:last-child {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Bitcoin Network Metrics</h1>
+        <div class="metrics-grid">
+            <div class="metric-card users">
+                <div class="metric-header">
+                    <h2>Active Users</h2>
+                    <div class="time-range-buttons">
+                        <button class="time-button" data-range="7days">7D</button>
+                        <button class="time-button active" data-range="30days">30D</button>
+                        <button class="time-button" data-range="1year">1Y</button>
+                        <button class="time-button" data-range="all">All</button>
+                    </div>
+                </div>
+                <div id="users-viz" class="visualization users-viz"></div>
+            </div>
+            <div class="metric-card miners">
+                <div class="metric-header">
+                    <h2>Mining Distribution</h2>
+                </div>
+                <div id="miners-viz" class="visualization miners-viz"></div>
+            </div>
+            <div class="metric-card nodes">
+                <div class="metric-header">
+                    <h2>Network Nodes</h2>
+                </div>
+                <div id="nodes-viz" class="visualization nodes-viz"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTimeRange = '30days';
+
+        // Cache for API responses to handle rate limiting
+        const cache = {
+            users: { data: null, timestamp: 0 },
+            miners: { data: null, timestamp: 0 },
+            nodes: { data: null, timestamp: 0 }
+        };
+
+        // Cache duration (5 minutes)
+        const CACHE_DURATION = 5 * 60 * 1000;
+
+        async function fetchWithCache(url, cacheKey) {
+            const now = Date.now();
+            if (cache[cacheKey] && (now - cache[cacheKey].timestamp) < CACHE_DURATION) {
+                return cache[cacheKey].data;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                cache[cacheKey] = { data, timestamp: now };
+                return data;
+            } catch (error) {
+                console.error(`Error fetching ${cacheKey} data:`, error);
+                return cache[cacheKey]?.data; // Return cached data if available
+            }
+        }
+
+        async function fetchNetworkData(timeRange = currentTimeRange) {
+            try {
+                const [usersData, minersData, nodesResponse] = await Promise.all([
+                    fetchWithCache(
+                        `https://api.blockchain.info/charts/n-unique-addresses?timespan=${timeRange}&format=json&cors=true`,
+                        `users-${timeRange}`
+                    ),
+                    fetchWithCache(
+                        'https://api.blockchain.info/pools?timespan=5days',
+                        'miners'
+                    ),
+                    fetch('https://bitnodes.io/api/v1/snapshots/latest/')
+                ]);
+
+                if (usersData) updateUsersVisualization(usersData);
+                if (minersData) updateMinersVisualization(minersData);
+                
+                if (nodesResponse.ok) {
+                    const nodesData = await nodesResponse.json();
+                    console.log('Raw nodes data:', nodesData); // Debug log
+                    updateNodesVisualization(nodesData);
+                }
+            } catch (error) {
+                console.error('Error in fetchNetworkData:', error);
+            }
+        }
+
+        function updateUsersVisualization(data) {
+            console.log('Updating visualization with data:', data);
+
+            // Clear previous visualization
+            const container = document.getElementById('users-viz');
+            container.innerHTML = '';
+
+            const margin = { top: 20, right: 20, bottom: 30, left: 70 };
+            const width = container.clientWidth - margin.left - margin.right;
+            const height = container.clientHeight - margin.top - margin.bottom;
+
+            console.log('Container dimensions:', { width, height });
+
+            const svg = d3.select('#users-viz')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Ensure we have data to visualize
+            if (!data.values || !data.values.length) {
+                console.error('No data available');
+                return;
+            }
+
+            const x = d3.scaleTime()
+                .domain(d3.extent(data.values, d => new Date(d.x * 1000)))
+                .range([0, width]);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(data.values, d => d.y)])
+                .range([height, 0]);
+
+            // Add area path
+            const area = d3.area()
+                .x(d => x(new Date(d.x * 1000)))
+                .y0(height)
+                .y1(d => y(d.y))
+                .curve(d3.curveMonotoneX);
+
+            svg.append('path')
+                .datum(data.values)
+                .attr('class', 'area-path')
+                .attr('d', area);
+
+            // Adjust tick format based on time range
+            const xAxisTickFormat = currentTimeRange === '24h' ? d3.timeFormat("%H:%M") :
+                                  currentTimeRange === '30days' ? d3.timeFormat("%b %d") :
+                                  currentTimeRange === '1year' ? d3.timeFormat("%b %Y") :
+                                  d3.timeFormat("%Y");
+
+            // Update X axis with new format
+            svg.append('g')
+                .attr('transform', `translate(0,${height})`)
+                .attr('class', 'x-axis')
+                .call(d3.axisBottom(x)
+                    .ticks(5)
+                    .tickFormat(xAxisTickFormat))
+                .attr('color', '#94a3b8')
+                .style('font-size', '12px');
+
+            // Adjust Y axis tick intervals based on time range
+            const yAxisTicks = currentTimeRange === '7days' || currentTimeRange === '30days'
+                ? d3.range(0, d3.max(data.values, d => d.y), 100000)
+                : d3.range(0, d3.max(data.values, d => d.y), 200000);
+
+            // Update Y axis with new tick intervals
+            svg.append('g')
+                .attr('class', 'y-axis')
+                .call(d3.axisLeft(y)
+                    .tickValues(yAxisTicks)
+                    .tickFormat(d => d3.format(",")(d)))
+                .attr('color', '#94a3b8')
+                .style('font-size', '12px');
+
+            // Add tooltip
+            const tooltip = d3.select('body').append('div')
+                .attr('class', 'tooltip');
+
+            const bisect = d3.bisector(d => new Date(d.x * 1000)).left;
+
+            svg.append('rect')
+                .attr('width', width)
+                .attr('height', height)
+                .style('fill', 'none')
+                .style('pointer-events', 'all')
+                .on('mousemove', function(event) {
+                    const x0 = x.invert(d3.pointer(event, this)[0]);
+                    const i = bisect(data.values, x0, 1);
+                    const d0 = data.values[i - 1];
+                    const d1 = data.values[i];
+                    const d = x0 - d0.x > d1.x - x0 ? d1 : d0;
+
+                    tooltip
+                        .style('opacity', 1)
+                        .style('left', (event.pageX + 10) + 'px')
+                        .style('top', (event.pageY - 10) + 'px')
+                        .html(`Date: ${new Date(d.x * 1000).toLocaleDateString()}<br>Users: ${d.y.toLocaleString()}`);
+                })
+                .on('mouseout', function() {
+                    tooltip.style('opacity', 0);
+                });
+        }
+
+        function updateMinersVisualization(data) {
+            const container = document.getElementById('miners-viz');
+            container.innerHTML = '';
+
+            const margin = { top: 20, right: 20, bottom: 20, left: 20 };
+            const width = container.clientWidth - margin.left - margin.right;
+            const height = container.clientHeight - margin.top - margin.bottom;
+
+            const svg = d3.select('#miners-viz')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Sort and normalize the data
+            const sortedEntries = Object.entries(data)
+                .sort((a, b) => b[1] - a[1]); // Sort by value descending
+
+            const total = sortedEntries.reduce((sum, [_, value]) => sum + value, 0);
+            const normalizedData = sortedEntries.map(([key, value]) => ({
+                name: key,
+                value: value / total
+            }));
+
+            // Create hierarchical data
+            const root = d3.hierarchy({
+                children: normalizedData
+            })
+            .sum(d => d.value);
+
+            // Create treemap layout
+            d3.treemap()
+                .size([width, height])
+                .padding(1)
+                (root);
+
+            // Create color scale with explicit domain
+            const colorScale = d3.scaleOrdinal()
+                .domain(normalizedData.map(d => d.name))
+                .range(d3.schemeOranges[9]);
+
+            // Create cells
+            const cell = svg.selectAll('g')
+                .data(root.leaves())
+                .join('g')
+                .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+            cell.append('rect')
+                .attr('class', 'treemap-cell')
+                .attr('width', d => d.x1 - d.x0)
+                .attr('height', d => d.y1 - d.y0)
+                .attr('fill', d => colorScale(d.data.name));
+
+            // Add labels
+            cell.append('text')
+                .attr('class', 'treemap-label')
+                .attr('x', 3)
+                .attr('y', 13)
+                .attr('fill', d => {
+                    const cellWidth = d.x1 - d.x0;
+                    const cellHeight = d.y1 - d.y0;
+                    
+                    // Debug logs
+                    console.log('Cell dimensions:', {
+                        width: cellWidth,
+                        height: cellHeight,
+                        data: d.data[0],
+                        index: root.leaves().indexOf(d)
+                    });
+                    
+                    if (cellWidth < 60 || cellHeight < 30) return 'transparent';
+                    
+                    // Get the index of this box in size order
+                    const index = root.leaves().indexOf(d);
+                    const color = (index % 10 < 2) ? '#1e293b' : '#ffffff';
+                    
+                    // Debug log
+                    console.log('Text color:', {
+                        name: d.data[0],
+                        index: index,
+                        color: color
+                    });
+                    
+                    return color;
+                })
+                .text(d => {
+                    const cellWidth = d.x1 - d.x0;
+                    const cellHeight = d.y1 - d.y0;
+                    const text = cellWidth < 60 || cellHeight < 30 ? '' : d.data.name;
+                    
+                    // Debug log
+                    console.log('Text content:', {
+                        name: d.data[0],
+                        width: cellWidth,
+                        height: cellHeight,
+                        text: text
+                    });
+                    
+                    return text;
+                });
+
+            // Add tooltip
+            const tooltip = d3.select('body').append('div')
+                .attr('class', 'tooltip');
+
+            cell.on('mousemove', function(event, d) {
+                tooltip
+                    .style('opacity', 1)
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px')
+                    .html(`
+                        ${d.data.name}<br>
+                        Hashrate: ${Math.round(d.data.value * 100)}%
+                    `);
+            })
+            .on('mouseout', () => tooltip.style('opacity', 0));
+        }
+
+        function updateNodesVisualization(data) {
+            const container = document.getElementById('nodes-viz');
+            container.innerHTML = '';
+
+            // Fine-tune margins
+            const margin = { top: 0, right: 20, bottom: 40, left: 20 };
+            const width = container.clientWidth - margin.left - margin.right;
+            const height = container.clientHeight - margin.top - margin.bottom;
+
+            console.log('Container dimensions:', { width, height }); // Debug log
+
+            const svg = d3.select('#nodes-viz')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Adjust projection to make map bigger while maintaining aspect ratio
+            const projection = d3.geoMercator()
+                .scale((width / 2.2) / Math.PI)  // Increased scale for bigger map
+                .translate([width / 2, height / 1.65]);
+
+            const path = d3.geoPath().projection(projection);
+
+            // Load world map data
+            d3.json("https://unpkg.com/world-atlas@2/countries-110m.json").then(worldData => {
+                // Draw world map
+                svg.append("g")
+                    .selectAll("path")
+                    .data(topojson.feature(worldData, worldData.objects.countries).features)
+                    .join("path")
+                    .attr("fill", "#1e293b")
+                    .attr("stroke", "#94a3b8")
+                    .attr("stroke-width", 0.5)
+                    .attr("d", path);
+
+                // Process nodes data - using address field to get coordinates
+                const nodesArray = [];
+                for (const [nodeId, nodeInfo] of Object.entries(data.nodes)) {
+                    // The address field contains the IP:PORT
+                    const address = nodeInfo[1];  // Get the address string
+                    if (nodeInfo[8] && nodeInfo[9]) {  // Check if lat/lon exists
+                        nodesArray.push({
+                            id: nodeId,
+                            address: address,
+                            latitude: nodeInfo[8],  // Latitude
+                            longitude: nodeInfo[9], // Longitude
+                            version: nodeInfo[2]    // Node version
+                        });
+                    }
+                }
+
+                console.log('Processed nodes:', nodesArray.slice(0, 5));
+
+                // Add nodes to the map
+                svg.selectAll("circle.node")
+                    .data(nodesArray)
+                    .join("circle")
+                    .attr("class", "node")
+                    .attr("cx", d => {
+                        const projectedCoords = projection([d.longitude, d.latitude]);
+                        return projectedCoords ? projectedCoords[0] : null;
+                    })
+                    .attr("cy", d => {
+                        const projectedCoords = projection([d.longitude, d.latitude]);
+                        return projectedCoords ? projectedCoords[1] : null;
+                    })
+                    .attr("r", 3)
+                    .attr("fill", "#f7931a")
+                    .attr("opacity", 0.6)
+                    .attr("stroke", "#ffffff")
+                    .attr("stroke-width", 0.5);
+
+                // Add hover effects
+                const tooltip = d3.select('body').append('div')
+                    .attr('class', 'tooltip');
+
+                svg.selectAll("circle.node")
+                    .on("mouseover", function(event, d) {
+                        d3.select(this)
+                            .attr("r", 5)
+                            .attr("opacity", 1);
+
+                        tooltip
+                            .style("opacity", 1)
+                            .html(`
+                                Node Version: ${d.version}<br>
+                                Address: ${d.address}<br>
+                                Location: ${d.latitude.toFixed(2)}, ${d.longitude.toFixed(2)}
+                            `)
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 10) + "px");
+                    })
+                    .on("mouseout", function() {
+                        d3.select(this)
+                            .attr("r", 3)
+                            .attr("opacity", 0.6);
+
+                        tooltip.style("opacity", 0);
+                    });
+            });
+        }
+
+        // Add event listeners to time range buttons
+        document.querySelectorAll('.time-button').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                // Update active button
+                document.querySelectorAll('.time-button').forEach(btn => 
+                    btn.classList.remove('active'));
+                e.target.classList.add('active');
+
+                // Update data
+                currentTimeRange = e.target.dataset.range;
+                await fetchNetworkData(currentTimeRange);
+            });
+        });
+
+        // Initial load
+        fetchNetworkData();
+        // Update every 5 minutes
+        setInterval(fetchNetworkData, CACHE_DURATION);
+    </script>
+</body>
+</html> 

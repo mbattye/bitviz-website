@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BitViz</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 2rem;
+            color: #f7931a;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-button {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            background-color: #f7931a;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+
+        .nav-button:hover {
+            background-color: #e67f00;
+        }
+    </style>
+</head>
+<body>
+    <h1>BitViz</h1>
+    <div class="button-container">
+        <a href="/bitcoin-metrics" class="nav-button">Metrics</a>
+        <a href="/bitcoin-price" class="nav-button">Price</a>
+    </div>
+</body>
+</html>
