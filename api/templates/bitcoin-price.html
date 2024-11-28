@@ -68,25 +68,34 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            padding: 0.5rem 1rem;
-            font-size: 1rem;
+            padding: 0.8rem;
             background-color: #333333;
-            color: #f7931a;
-            border: 1px solid #f7931a;
+            border: none;
             border-radius: 5px;
             cursor: pointer;
             text-decoration: none;
             transition: all 0.3s;
+            line-height: 0;  /* This helps center the icon better */
         }
 
-        .home-button:hover {
-            background-color: #f7931a;
-            color: white;
+        .home-button svg {
+            width: 20px;
+            height: 20px;
+            fill: #94a3b8;
+            transition: fill 0.3s;
+        }
+
+        .home-button:hover svg {
+            fill: #f7931a;
         }
     </style>
 </head>
 <body>
-    <a href="/" class="home-button">Home</a>
+    <a href="/" class="home-button">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 12h3v8h14v-8h3L12 2zm0 2.83L19.17 12H18v8H6v-8H4.83L12 4.83z"/>
+        </svg>
+    </a>
     <div class="container">
         <div class="title">Bitcoin</div>
         <div class="price-display">
