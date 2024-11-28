@@ -32,25 +32,26 @@
         .nav-button {
             padding: 1rem 2rem;
             font-size: 1.2rem;
-            background-color: #f7931a;
-            color: white;
-            border: none;
+            background-color: #333333;
+            color: #f7931a;
+            border: 1px solid #f7931a;
             border-radius: 5px;
             cursor: pointer;
             text-decoration: none;
-            transition: background-color 0.3s;
+            transition: all 0.3s;
         }
 
         .nav-button:hover {
-            background-color: #e67f00;
+            background-color: #f7931a;
+            color: white;
         }
     </style>
 </head>
 <body>
     <h1>BitViz</h1>
     <div class="button-container">
-        <a href="/bitcoin-metrics" class="nav-button">Metrics</a>
         <a href="/bitcoin-price" class="nav-button">Price</a>
+        <a href="/bitcoin-metrics" class="nav-button">Metrics</a>
     </div>
 </body>
 </html>
