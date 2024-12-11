@@ -163,19 +163,15 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            padding: 0.8rem;
-            background-color: #333333;
-            border: none;
-            border-radius: 5px;
             cursor: pointer;
             text-decoration: none;
             transition: all 0.3s;
-            line-height: 0;  /* This helps center the icon better */
+            line-height: 0;
         }
 
         .home-button svg {
-            width: 20px;
-            height: 20px;
+            width: 28px;
+            height: 28px;
             fill: #94a3b8;
             transition: fill 0.3s;
         }
@@ -188,7 +184,7 @@
 <body>
     <a href="/" class="home-button">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 12h3v8h14v-8h3L12 2zm0 2.83L19.17 12H18v8H6v-8H4.83L12 4.83z"/>
+            <path d="M19 21H5a1 1 0 0 1-1-1v-9H1l10.327-9.388a1 1 0 0 1 1.346 0L23 11h-3v9a1 1 0 0 1-1 1zm-6-2h5v-9.15L12 4.2l-6 5.65V19h5v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3z"/>
         </svg>
     </a>
     <div class="container">
@@ -602,4 +598,29 @@
                             .attr("r", 3)
                             .attr("opacity", 0.6);
 
-     
+                        tooltip.style("opacity", 0);
+                    });
+            });
+        }
+
+        // Add event listeners to time range buttons
+        document.querySelectorAll('.time-button').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                // Update active button
+                document.querySelectorAll('.time-button').forEach(btn => 
+                    btn.classList.remove('active'));
+                e.target.classList.add('active');
+
+                // Update data
+                currentTimeRange = e.target.dataset.range;
+                await fetchNetworkData(currentTimeRange);
+            });
+        });
+
+        // Initial load
+        fetchNetworkData();
+        // Update every 5 minutes
+        setInterval(fetchNetworkData, CACHE_DURATION);
+    </script>
+</body>
+</html> 
