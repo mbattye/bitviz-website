@@ -1,5 +1,20 @@
 {
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "runtime": "python3.9",
+        "maxLambdaSize": "15mb",
+        "pythonPath": ".venv/lib/python3.9/site-packages" 
+      }
+    }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    { 
+      "source": "/(.*)",
+      "destination": "/api/index.py"
+    }
   ]
 }

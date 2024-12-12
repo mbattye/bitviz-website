@@ -1,28 +1,10 @@
-from flask import (
-    Blueprint,
-    redirect,
-    render_template,
-    session,
-    request,
-)
+from flask import render_template
 
-pages = Blueprint(
-    "pages", __name__, template_folder="templates", static_folder="static"
-)
+def init_routes(app):
+    @app.route('/bitcoin-price')
+    def bitcoin_price():
+        return render_template('bitcoin-price.html')
 
-@pages.route("/")
-def index():
-    return render_template(
-        "index.html",
-        title="Mike Battye",
-    )
-
-@pages.get("/toggle-theme")
-def toggle_theme():
-    current_theme = session.get("theme")
-    if current_theme == "dark":
-        session["theme"] = "light"
-    else:
-        session["theme"] = "dark"
-
-    return redirect(request.args.get("current_page"))
+    @app.route('/bitcoin-metrics')
+    def bitcoin_metrics():
+        return render_template('bitcoin-metrics.html')

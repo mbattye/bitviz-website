@@ -63,7 +63,6 @@
             color: #f7931a;
         }
 
-
         .home-button {
             position: fixed;
             top: 20px;
@@ -84,6 +83,123 @@
         .home-button:hover svg {
             fill: #f7931a;
         }
+
+        .price-container {
+            position: relative;
+            margin: 0 auto;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .price-container.panel-open {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+        }
+
+        .graph-panel {
+            position: fixed;
+            bottom: -100vh;
+            left: 0;
+            width: 100%;
+            height: 90vh;
+            background-color: #1e293b;
+            transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border-top: 1px solid #38bdf8;
+            box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);
+            z-index: 10;
+        }
+
+        .graph-panel.open {
+            bottom: 0;
+        }
+
+        .panel-tab {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #1e293b;
+            padding: 8px 16px;
+            border-radius: 8px 8px 0 0;
+            border: 1px solid #38bdf8;
+            border-bottom: none;
+            cursor: pointer;
+            color: #38bdf8;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            z-index: 30;
+        }
+
+        .panel-tab:hover {
+            background-color: #38bdf8;
+            color: #0f172a;
+        }
+
+        .panel-tab svg {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s;
+        }
+
+        .graph-panel.open .panel-tab svg {
+            transform: rotate(180deg);
+        }
+
+        .graph-container {
+            padding: 2rem;
+            height: 100%;
+        }
+
+        .graph-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .time-range-slider {
+            width: 100%;
+            margin: 1rem 0;
+        }
+
+        #priceChart {
+            width: 100%;
+            height: calc(100% - 100px);
+            background-color: #1e293b;
+        }
+
+        .time-range-buttons {
+            margin-bottom: 1rem;
+        }
+
+        .time-button {
+            background: #1e293b;
+            border: 1px solid #94a3b8;
+            color: #94a3b8;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-right: 0.5rem;
+        }
+
+        .time-button:hover {
+            border-color: #f7931a;
+            color: #f7931a;
+        }
+
+        .time-button.active {
+            background: #f7931a;
+            border-color: #f7931a;
+            color: #0f172a;
+        }
     </style>
 </head>
 <body>
@@ -92,7 +208,7 @@
             <path d="M19 21H5a1 1 0 0 1-1-1v-9H1l10.327-9.388a1 1 0 0 1 1.346 0L23 11h-3v9a1 1 0 0 1-1 1zm-6-2h5v-9.15L12 4.2l-6 5.65V19h5v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3z"/>
         </svg>
     </a>
-    <div class="container">
+    <div class="price-container">
         <div class="title">Bitcoin</div>
         <div class="price-display">
             <span id="price">...</span>
@@ -101,39 +217,91 @@
         <div class="change" id="change">... <span style="color: #94a3b8">24h</span></div>
     </div>
 
+    <div class="graph-panel">
+        <div class="panel-tab">
+            <span>Historical Price</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+            </svg>
+        </div>
+        <div class="graph-container">
+            <div class="graph-controls">
+                <div class="time-range-buttons">
+                    <button class="time-button active" data-range="1M">1M</button>
+                    <button class="time-button" data-range="3M">3M</button>
+                    <button class="time-button" data-range="6M">6M</button>
+                    <button class="time-button" data-range="1Y">1Y</button>
+                    <button class="time-button" data-range="ALL">ALL</button>
+                </div>
+            </div>
+            <canvas id="priceChart"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script>
         let currentCurrency = 'gbp';
 
+        // Cache for API responses
+        const cache = {
+            price: { data: null, timestamp: 0 },
+            historical: {
+                '1M': { data: null, timestamp: 0 },
+                '3M': { data: null, timestamp: 0 },
+                '6M': { data: null, timestamp: 0 },
+                '1Y': { data: null, timestamp: 0 },
+                'ALL': { data: null, timestamp: 0 }
+            }
+        };
+
+        // Cache duration (5 minutes)
+        const CACHE_DURATION = 5 * 60 * 1000;
+
+        // Function to fetch with cache
+        async function fetchWithCache(url, cacheKey) {
+            const now = Date.now();
+            if (cache[cacheKey] && (now - cache[cacheKey].timestamp) < CACHE_DURATION) {
+                return cache[cacheKey].data;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                cache[cacheKey] = { data, timestamp: now };
+                return data;
+            } catch (error) {
+                console.error(`Error fetching ${cacheKey} data:`, error);
+                return cache[cacheKey]?.data; // Return cached data if available
+            }
+        }
+
+        // Modified price fetching function
         async function fetchBitcoinPrice() {
             try {
-                const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currentCurrency.toLowerCase()}&include_24hr_change=true`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                const price = data.bitcoin[currentCurrency.toLowerCase()];
-                const change = data.bitcoin[`${currentCurrency.toLowerCase()}_24h_change`];
-                
-                const currencySymbol = currentCurrency.toLowerCase() === 'gbp' ? '£' : '$';
-                document.getElementById('price').textContent = currencySymbol + price.toLocaleString(
-                    currentCurrency.toLowerCase() === 'gbp' ? 'en-GB' : 'en-US', 
-                    {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    }
+                const data = await fetchWithCache(
+                    `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currentCurrency.toLowerCase()}&include_24hr_change=true`,
+                    'price'
                 );
                 
-                const changeElement = document.getElementById('change');
-                const changeText = `${change.toFixed(2)}% <span style="color: #94a3b8">24h</span>`;
-                changeElement.innerHTML = change >= 0 ? '+' + changeText : changeText;
-                changeElement.className = 'change ' + (change >= 0 ? 'positive' : 'negative');
+                if (data) {
+                    const price = data.bitcoin[currentCurrency.toLowerCase()];
+                    const change = data.bitcoin[`${currentCurrency.toLowerCase()}_24h_change`];
+                    
+                    const currencySymbol = currentCurrency.toLowerCase() === 'gbp' ? '£' : '$';
+                    document.getElementById('price').textContent = currencySymbol + price.toLocaleString(
+                        currentCurrency.toLowerCase() === 'gbp' ? 'en-GB' : 'en-US', 
+                        { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                    );
+                    
+                    const changeElement = document.getElementById('change');
+                    const changeText = `${change.toFixed(2)}% <span style="color: #94a3b8">24h</span>`;
+                    changeElement.innerHTML = change >= 0 ? '+' + changeText : changeText;
+                    changeElement.className = 'change ' + (change >= 0 ? 'positive' : 'negative');
+                }
             } catch (error) {
-                console.error('Error fetching Bitcoin price:', error);
-                // Don't update the DOM elements at all when there's an error
-                // This will preserve the last known values
+                console.error('Error in fetchBitcoinPrice:', error);
             }
         }
 
@@ -154,11 +322,203 @@
             }, 250);
         });
 
-        // Fetch initial price
-        fetchBitcoinPrice();
+        // Clear existing event listeners before adding new ones
+        document.querySelectorAll('.time-button').forEach(button => {
+            button.replaceWith(button.cloneNode(true));
+        });
 
+        // Add fresh event listeners with better logging
+        document.querySelectorAll('.time-button').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                try {
+                    const range = e.target.dataset.range;
+                    console.log(`Time button clicked: ${range}`);
+
+                    // Update active button state
+                    document.querySelectorAll('.time-button').forEach(btn => 
+                        btn.classList.remove('active'));
+                    e.target.classList.add('active');
+
+                    // Clear existing chart data
+                    if (chart) {
+                        chart.data.labels = [];
+                        chart.data.datasets[0].data = [];
+                        chart.update();
+                    }
+
+                    console.log(`Fetching data for range: ${range}`);
+                    const data = await fetchChartData(range);
+                    
+                    if (!data) {
+                        console.error(`No data returned for range: ${range}`);
+                        return;
+                    }
+
+                    console.log(`Successfully updated chart with ${data.prices?.length} data points`);
+                } catch (error) {
+                    console.error('Error in time button click handler:', error);
+                }
+            });
+        });
+
+        // Modified chart data fetching
+        async function fetchChartData(range) {
+            console.log(`fetchChartData called with range: ${range}`);
+            
+            try {
+                const url = `/api/bitcoin-historical/${range}`;
+                const response = await fetch(url);
+                console.log(`Response status: ${response.status}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data?.prices?.length) {
+                    throw new Error('Invalid data received');
+                }
+
+                if (!chart) {
+                    await initializeChart(data);
+                } else {
+                    updateChart(data);
+                }
+            } catch (error) {
+                console.error(`Error fetching ${range} data:`, error);
+            }
+        }
+
+        // Separate function to update the chart
+        function updateChart(data) {
+            if (!chart || !data?.prices) return;
+            
+            chart.data.labels = data.prices.map(price => new Date(price[0]).toLocaleDateString());
+            chart.data.datasets[0].data = data.prices.map(price => price[1]);
+            chart.update();
+        }
+
+        // Initial load
+        fetchBitcoinPrice();
         // Update price every 30 seconds
         setInterval(fetchBitcoinPrice, 30000);
+
+        // Pre-fetch all historical data ranges when chart is first opened
+        async function preloadHistoricalData() {
+            const ranges = ['1M', '3M', '6M', '1Y', 'ALL'];
+            for (const range of ranges) {
+                await fetchChartData(range);
+            }
+        }
+
+        // Code for the graph panel
+        const graphPanel = document.querySelector('.graph-panel');
+        const panelTab = document.querySelector('.panel-tab');
+        const priceContainer = document.querySelector('.price-container');
+        let chart = null;
+
+        panelTab.addEventListener('click', () => {
+            graphPanel.classList.toggle('open');
+            priceContainer.classList.toggle('panel-open');
+            if (graphPanel.classList.contains('open')) {
+                if (!chart) {
+                    initializeChart();
+                    // Set initial active button
+                    const defaultButton = document.querySelector('[data-range="1M"]');
+                    defaultButton.classList.add('active');
+                    // Only fetch 1M data initially
+                    fetchChartData('1M');
+                }
+            }
+        });
+
+        async function initializeChart(data) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            const currentRange = document.querySelector('.time-button.active')?.dataset.range;
+            
+            try {
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.prices.map(price => new Date(price[0]).toLocaleDateString()),
+                        datasets: [{
+                            label: 'Bitcoin Price (GBP)',
+                            data: data.prices.map(price => price[1]),
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {
+                            padding: {
+                                bottom: currentRange === 'ALL' ? 20 : 40
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                backgroundColor: '#1e293b',
+                                borderColor: '#38bdf8',
+                                borderWidth: 1,
+                                titleColor: '#e2e8f0',
+                                bodyColor: '#e2e8f0',
+                                displayColors: false,
+                                callbacks: {
+                                    label: (context) => `£${context.raw.toLocaleString()}`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    color: 'rgba(148, 163, 184, 0.1)'
+                                },
+                                ticks: {
+                                    color: '#94a3b8'
+                                }
+                            },
+                            y: {
+                                grid: {
+                                    color: 'rgba(148, 163, 184, 0.1)',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    color: '#94a3b8',
+                                    callback: (value) => value >= 0 ? `£${value.toLocaleString()}` : '',
+                                    padding: 5
+                                },
+                                afterDataLimits: (scale) => {
+                                    const range = scale.max - scale.min;
+                                    const currentRange = document.querySelector('.time-button.active')?.dataset.range;
+                                    
+                                    if (currentRange === 'ALL') {
+                                        scale.min = 0;
+                                        scale.max += range * 0.01;
+                                    } else {
+                                        scale.min = Math.floor(scale.min / 100) * 100;
+                                        scale.min -= range * 0.1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing chart:', error);
+            }
+        }
     </script>
 </body>
 </html>
