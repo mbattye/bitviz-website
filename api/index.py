@@ -14,6 +14,10 @@ def home():
 def bitcoin_price():
     return render_template('bitcoin-price.html')
 
+@app.route('/bitcoin-metrics')
+def bitcoin_metrics():
+    return render_template('bitcoin-metrics.html')
+
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):
     print(f"Received request for range: {range}")
