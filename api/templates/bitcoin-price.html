@@ -99,6 +99,9 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 20;
+            background-color: #0f172a;
+            padding: 20px;
+            border-radius: 8px;
         }
 
         .graph-panel {
@@ -106,7 +109,7 @@
             bottom: -100vh;
             left: 0;
             width: 100%;
-            height: 90vh;
+            height: 80vh;
             background-color: #1e293b;
             transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             border-top: 1px solid #38bdf8;
@@ -150,6 +153,12 @@
 
         .graph-panel.open .panel-tab svg {
             transform: rotate(180deg);
+        }
+
+        .graph-panel.open .panel-tab {
+            position: absolute;
+            bottom: auto;
+            top: -40px;
         }
 
         .graph-container {
@@ -200,6 +209,38 @@
             border-color: #f7931a;
             color: #0f172a;
         }
+
+        .close-panel-btn {
+            position: absolute;
+            top: 16px;
+            right: 24px;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            z-index: 40;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(56,189,248,0.08);
+            transition: background 0.2s;
+        }
+
+        .close-panel-btn:hover {
+            background: #38bdf8;
+        }
+
+        .close-panel-btn:hover svg path,
+        .close-panel-btn:hover svg circle {
+            stroke: #0f172a;
+        }
+
+        .close-panel-btn:hover svg path {
+            fill: #0f172a;
+        }
     </style>
 </head>
 <body>
@@ -224,6 +265,12 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
             </svg>
         </div>
+        <button class="close-panel-btn" title="Close chart">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="11" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+                <path d="M8 10l4 4 4-4" stroke="#38bdf8" stroke-width="2"/>
+            </svg>
+        </button>
         <div class="graph-container">
             <div class="graph-controls">
                 <div class="time-range-buttons">
@@ -375,6 +422,7 @@
                 }
                 
                 const data = await response.json();
+                console.log('Received data:', data);
                 
                 if (!data?.prices?.length) {
                     throw new Error('Invalid data received');
@@ -385,18 +433,29 @@
                 } else {
                     updateChart(data);
                 }
+
+                return data;
             } catch (error) {
                 console.error(`Error fetching ${range} data:`, error);
+                return null;
             }
         }
 
         // Separate function to update the chart
         function updateChart(data) {
-            if (!chart || !data?.prices) return;
+            if (!chart || !data?.prices) {
+                console.error('Cannot update chart: chart not initialized or no data');
+                return;
+            }
             
-            chart.data.labels = data.prices.map(price => new Date(price[0]).toLocaleDateString());
-            chart.data.datasets[0].data = data.prices.map(price => price[1]);
-            chart.update();
+            try {
+                chart.data.labels = data.prices.map(price => new Date(price[0]).toLocaleDateString());
+                chart.data.datasets[0].data = data.prices.map(price => price[1]);
+                chart.update();
+                console.log('Chart updated successfully');
+            } catch (error) {
+                console.error('Error updating chart:', error);
+            }
         }
 
         // Initial load
@@ -423,7 +482,6 @@
             priceContainer.classList.toggle('panel-open');
             if (graphPanel.classList.contains('open')) {
                 if (!chart) {
-                    initializeChart();
                     // Set initial active button
                     const defaultButton = document.querySelector('[data-range="1M"]');
                     defaultButton.classList.add('active');
@@ -434,17 +492,64 @@
         });
 
         async function initializeChart(data) {
+            if (!data?.prices?.length) {
+                console.error('No data provided for chart initialization');
+                return;
+            }
+
             const ctx = document.getElementById('priceChart').getContext('2d');
             const currentRange = document.querySelector('.time-button.active')?.dataset.range;
             
             try {
+                console.log('Initializing chart with data:', data);
+                
+                // Process the data
+                const labels = data.prices.map(price => {
+                    try {
+                        const date = new Date(price[0]);
+                        if (isNaN(date.getTime())) {
+                            console.error('Invalid date:', price[0]);
+                            return 'Invalid Date';
+                        }
+                        return date.toLocaleDateString();
+                    } catch (error) {
+                        console.error('Error processing date:', error);
+                        return 'Invalid Date';
+                    }
+                });
+                
+                const values = data.prices.map(price => {
+                    try {
+                        const value = parseFloat(price[1]);
+                        if (isNaN(value)) {
+                            console.error('Invalid price value:', price[1]);
+                            return 0;
+                        }
+                        return value;
+                    } catch (error) {
+                        console.error('Error processing price:', error);
+                        return 0;
+                    }
+                });
+                
+                console.log('Processed data:', { 
+                    labels: labels.slice(0, 5), 
+                    values: values.slice(0, 5),
+                    totalPoints: labels.length 
+                });
+                
+                // Destroy existing chart if it exists
+                if (chart) {
+                    chart.destroy();
+                }
+                
                 chart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: data.prices.map(price => new Date(price[0]).toLocaleDateString()),
+                        labels: labels,
                         datasets: [{
                             label: 'Bitcoin Price (GBP)',
-                            data: data.prices.map(price => price[1]),
+                            data: values,
                             borderColor: '#38bdf8',
                             backgroundColor: 'rgba(56, 189, 248, 0.1)',
                             borderWidth: 2,
@@ -476,7 +581,10 @@
                                 bodyColor: '#e2e8f0',
                                 displayColors: false,
                                 callbacks: {
-                                    label: (context) => `£${context.raw.toLocaleString()}`
+                                    label: (context) => {
+                                        const value = context.raw;
+                                        return value >= 0 ? `£${value.toLocaleString()}` : 'Invalid Price';
+                                    }
                                 }
                             }
                         },
@@ -486,7 +594,9 @@
                                     color: 'rgba(148, 163, 184, 0.1)'
                                 },
                                 ticks: {
-                                    color: '#94a3b8'
+                                    color: '#94a3b8',
+                                    maxRotation: 45,
+                                    minRotation: 45
                                 }
                             },
                             y: {
@@ -515,10 +625,18 @@
                         }
                     }
                 });
+                
+                console.log('Chart initialized successfully');
             } catch (error) {
                 console.error('Error initializing chart:', error);
             }
         }
+
+        // Close panel button logic
+        document.querySelector('.close-panel-btn').addEventListener('click', () => {
+            graphPanel.classList.remove('open');
+            priceContainer.classList.remove('panel-open');
+        });
     </script>
 </body>
 </html>

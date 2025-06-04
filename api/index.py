@@ -26,6 +26,10 @@ def get_historical_data(range):
         # Load the CSV file
         csv_path = Path(__file__).parent / 'data' / 'bitcoin_historical.csv'
         
+        if not csv_path.exists():
+            print(f"CSV file not found at {csv_path}")
+            return jsonify({'error': 'Historical data file not found'}), 404
+        
         # Convert range to days
         days_map = {
             '1M': 30,
@@ -36,6 +40,9 @@ def get_historical_data(range):
         }
         
         days = days_map.get(range)
+        if days is None and range != 'ALL':
+            return jsonify({'error': f'Invalid range: {range}'}), 400
+            
         cutoff_date = None
         if days:
             cutoff_date = datetime.now() - timedelta(days=days)
@@ -44,14 +51,23 @@ def get_historical_data(range):
         with open(csv_path, 'r') as file:
             reader = csv.DictReader(file)
             for row in reader:
-                date = datetime.strptime(row['Date'], '%Y-%m-%d')
-                if cutoff_date and date < cutoff_date:
+                try:
+                    date = datetime.strptime(row['Date'], '%Y-%m-%d')
+                    if cutoff_date and date < cutoff_date:
+                        continue
+                    # Convert date to timestamp in milliseconds
+                    timestamp = int(time.mktime(date.timetuple()) * 1000)
+                    price = float(row['Close'])
+                    prices.append([timestamp, price])
+                except (ValueError, KeyError) as e:
+                    print(f"Error processing row: {row}, Error: {e}")
                     continue
-                # Convert date to timestamp in milliseconds
-                timestamp = int(time.mktime(date.timetuple()) * 1000)
-                price = float(row['Close'])
-                prices.append([timestamp, price])
         
+        if not prices:
+            print(f"No data found for range: {range}")
+            return jsonify({'error': 'No data available for the specified range'}), 404
+            
+        print(f"Returning {len(prices)} data points for range: {range}")
         return jsonify({'prices': prices})
             
     except Exception as e:
