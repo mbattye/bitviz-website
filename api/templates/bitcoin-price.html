@@ -292,7 +292,7 @@
 
         // Cache for API responses
         const cache = {
-            price: { data: null, timestamp: 0 },
+            price: {}, // Use an object to store prices by currency
             historical: {
                 '1M': { data: null, timestamp: 0 },
                 '3M': { data: null, timestamp: 0 },
@@ -327,9 +327,10 @@
         // Modified price fetching function
         async function fetchBitcoinPrice() {
             try {
+                const cacheKey = `price-${currentCurrency.toLowerCase()}`;
                 const data = await fetchWithCache(
                     `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currentCurrency.toLowerCase()}&include_24hr_change=true`,
-                    'price'
+                    cacheKey
                 );
                 
                 if (data) {
