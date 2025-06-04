@@ -29,8 +29,10 @@ jobs:
         python api/data/fetch_historical_data.py
         
     - name: Commit and push if changed
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add api/data/bitcoin_historical.csv
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Update Bitcoin historical data [skip ci]" && git push) 
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Update Bitcoin historical data [skip ci]" && git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}) 
