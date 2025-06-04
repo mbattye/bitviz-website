@@ -289,6 +289,7 @@
 
     <script>
         let currentCurrency = 'gbp';
+        let displayMode = 'btc'; // 'btc' or 'sats'
 
         // Cache for API responses
         const cache = {
@@ -338,13 +339,24 @@
                     const change = data.bitcoin[`${currentCurrency.toLowerCase()}_24h_change`];
                     
                     const currencySymbol = currentCurrency.toLowerCase() === 'gbp' ? '£' : '$';
-                    document.getElementById('price').textContent = currencySymbol + price.toLocaleString(
-                        currentCurrency.toLowerCase() === 'gbp' ? 'en-GB' : 'en-US', 
-                        { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                    );
+                    const priceElement = document.getElementById('price');
+                    const currencyElement = document.getElementById('currency');
+                    
+                    if (displayMode === 'btc') {
+                        priceElement.textContent = currencySymbol + price.toLocaleString(
+                            currentCurrency.toLowerCase() === 'gbp' ? 'en-GB' : 'en-US', 
+                            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                        );
+                        currencyElement.textContent = currentCurrency.toUpperCase();
+                    } else {
+                        // Sats mode: show sats per unit (rounded to whole number)
+                        const satsPerUnit = Math.round(100000000 / price);
+                        priceElement.textContent = satsPerUnit.toLocaleString();
+                        currencyElement.textContent = `sats/${currencySymbol}`;
+                    }
                     
                     const changeElement = document.getElementById('change');
-                    const changeText = `${change.toFixed(2)}% <span style="color: #94a3b8">24h</span>`;
+                    const changeText = `${change.toFixed(2)}% <span style=\"color: #94a3b8\">24h</span>`;
                     changeElement.innerHTML = change >= 0 ? '+' + changeText : changeText;
                     changeElement.className = 'change ' + (change >= 0 ? 'positive' : 'negative');
                 }
@@ -361,7 +373,6 @@
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
                 currentCurrency = currentCurrency === 'gbp' ? 'usd' : 'gbp';
-                currencyElement.textContent = currentCurrency.toUpperCase();
                 fetchBitcoinPrice();
                 
                 setTimeout(() => {
@@ -637,6 +648,12 @@
         document.querySelector('.close-panel-btn').addEventListener('click', () => {
             graphPanel.classList.remove('open');
             priceContainer.classList.remove('panel-open');
+        });
+
+        // Add click event to the title to toggle between BTC and sats mode
+        document.querySelector('.title').addEventListener('click', () => {
+            displayMode = displayMode === 'btc' ? 'sats' : 'btc';
+            fetchBitcoinPrice();
         });
     </script>
 </body>
