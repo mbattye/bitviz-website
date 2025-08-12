@@ -104,6 +104,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             font-size: 0.8rem;
+            min-width: 44px;
         }
 
         .time-button:hover {
@@ -746,16 +747,26 @@
         }
 
         // Add event listeners to time range buttons
+        let metricsClickLock = false;
         document.querySelectorAll('.time-button').forEach(button => {
             button.addEventListener('click', async (e) => {
-                // Update active button
-                document.querySelectorAll('.time-button').forEach(btn => 
-                    btn.classList.remove('active'));
-                e.target.classList.add('active');
+                if (metricsClickLock) return;
+                metricsClickLock = true;
+                const buttons = Array.from(document.querySelectorAll('.time-button'));
+                buttons.forEach(b => b.disabled = true);
+                try {
+                    // Update active button
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
 
-                // Update data
-                currentTimeRange = e.target.dataset.range;
-                await fetchNetworkData(currentTimeRange);
+                    // Update data
+                    currentTimeRange = e.currentTarget.dataset.range;
+                    await fetchNetworkData(currentTimeRange);
+                } finally {
+                    const buttons = Array.from(document.querySelectorAll('.time-button'));
+                    buttons.forEach(b => b.disabled = false);
+                    setTimeout(() => { metricsClickLock = false; }, 200);
+                }
             });
         });
 

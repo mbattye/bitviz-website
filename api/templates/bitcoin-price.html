@@ -317,6 +317,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             margin-right: 0.5rem;
+            min-width: 56px;
         }
 
         .time-button:hover {
@@ -580,18 +581,22 @@
         });
 
         // Add fresh event listeners with better logging
+        let chartClickLock = false;
         document.querySelectorAll('.time-button').forEach(button => {
             button.addEventListener('click', async (e) => {
+                if (chartClickLock) return;
+                chartClickLock = true;
+                const buttons = Array.from(document.querySelectorAll('.time-button'));
+                buttons.forEach(b => b.disabled = true);
                 try {
-                    const range = e.target.dataset.range;
+                    const range = e.currentTarget.dataset.range;
                     console.log(`Time button clicked: ${range}`);
 
                     // Update active button state
-                    document.querySelectorAll('.time-button').forEach(btn => 
-                        btn.classList.remove('active'));
-                    e.target.classList.add('active');
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
 
-                    // Clear existing chart data
+                    // Clear existing chart data for smoother transition
                     if (chart) {
                         chart.data.labels = [];
                         chart.data.datasets[0].data = [];
@@ -600,15 +605,17 @@
 
                     console.log(`Fetching data for range: ${range}`);
                     const data = await fetchChartData(range);
-                    
                     if (!data) {
                         console.error(`No data returned for range: ${range}`);
                         return;
                     }
-
                     console.log(`Successfully updated chart with ${data.prices?.length} data points`);
                 } catch (error) {
                     console.error('Error in time button click handler:', error);
+                } finally {
+                    const buttons = Array.from(document.querySelectorAll('.time-button'));
+                    buttons.forEach(b => b.disabled = false);
+                    setTimeout(() => { chartClickLock = false; }, 200);
                 }
             });
         });
