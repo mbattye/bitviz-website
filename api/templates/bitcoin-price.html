@@ -5,9 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Price</title>
     <style>
+        /* Theme variables */
+        :root {
+            --bg: #0f172a;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --panel: #1e293b;
+            --panel-contrast: #0f172a;
+            --accent: #38bdf8; /* cyan */
+            --brand: #f7931a;  /* bitcoin orange */
+            --positive: #4ade80;
+            --negative: #f87171;
+            --grid: rgba(148, 163, 184, 0.1);
+            --chart-tooltip-bg: #1e293b;
+            --chart-tooltip-border: #38bdf8;
+        }
+
+        :root[data-theme="light"] {
+            --bg: #f8fafc; /* slate-50 */
+            --text: #0f172a; /* slate-900 */
+            --muted: #475569; /* slate-600 */
+            --panel: #ffffff;
+            --panel-contrast: #ffffff;
+            --accent: #0ea5e9; /* sky-500 */
+            --brand: #f7931a;
+            --positive: #16a34a;
+            --negative: #dc2626;
+            --grid: rgba(100, 116, 139, 0.15);
+            --chart-tooltip-bg: #ffffff;
+            --chart-tooltip-border: #0ea5e9;
+        }
+
         body {
-            background-color: #0f172a;
-            color: #e2e8f0;
+            background-color: var(--bg);
+            color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             display: flex;
             justify-content: center;
@@ -24,18 +55,18 @@
             font-size: 3.5rem;
             font-weight: 700;
             margin: 1rem 0;
-            color: #38bdf8;
+            color: var(--accent);
         }
 
         .currency {
             font-size: 1.5rem;
-            color: #94a3b8;
+            color: var(--muted);
             cursor: pointer;
             user-select: none;
         }
 
         .currency:hover {
-            color: #38bdf8;
+            color: var(--accent);
         }
 
         .change {
@@ -44,23 +75,23 @@
         }
 
         .positive {
-            color: #4ade80;
+            color: var(--positive);
         }
 
         .negative {
-            color: #f87171;
+            color: var(--negative);
         }
 
         .title {
             font-size: 1.5rem;
-            color: #94a3b8;
+            color: var(--muted);
             margin-bottom: 0.5rem;
             cursor: pointer;
             transition: color 0.2s ease;
         }
 
         .title:hover {
-            color: #f7931a;
+            color: var(--brand);
         }
 
         .home-button {
@@ -76,12 +107,12 @@
         .home-button svg {
             width: 28px;
             height: 28px;
-            fill: #94a3b8;
+            fill: var(--muted);
             transition: fill 0.3s;
         }
 
         .home-button:hover svg {
-            fill: #f7931a;
+            fill: var(--brand);
         }
 
         .price-container {
@@ -99,7 +130,7 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 20;
-            background-color: #0f172a;
+            background-color: var(--bg);
             padding: 20px;
             border-radius: 8px;
         }
@@ -110,9 +141,9 @@
             left: 0;
             width: 100%;
             height: 80vh;
-            background-color: #1e293b;
+            background-color: var(--panel);
             transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            border-top: 1px solid #38bdf8;
+            border-top: 1px solid var(--accent);
             box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);
             z-index: 10;
         }
@@ -126,13 +157,13 @@
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #1e293b;
+            background-color: var(--panel);
             padding: 8px 16px;
             border-radius: 8px 8px 0 0;
-            border: 1px solid #38bdf8;
+            border: 1px solid var(--accent);
             border-bottom: none;
             cursor: pointer;
-            color: #38bdf8;
+            color: var(--accent);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -141,8 +172,8 @@
         }
 
         .panel-tab:hover {
-            background-color: #38bdf8;
-            color: #0f172a;
+            background-color: var(--accent);
+            color: var(--panel-contrast);
         }
 
         .panel-tab svg {
@@ -181,7 +212,7 @@
         #priceChart {
             width: 100%;
             height: calc(100% - 100px);
-            background-color: #1e293b;
+            background-color: var(--panel);
         }
 
         .time-range-buttons {
@@ -189,9 +220,9 @@
         }
 
         .time-button {
-            background: #1e293b;
-            border: 1px solid #94a3b8;
-            color: #94a3b8;
+            background: var(--panel);
+            border: 1px solid var(--muted);
+            color: var(--muted);
             padding: 0.5rem 1rem;
             border-radius: 4px;
             cursor: pointer;
@@ -200,14 +231,14 @@
         }
 
         .time-button:hover {
-            border-color: #f7931a;
-            color: #f7931a;
+            border-color: var(--brand);
+            color: var(--brand);
         }
 
         .time-button.active {
-            background: #f7931a;
-            border-color: #f7931a;
-            color: #0f172a;
+            background: var(--brand);
+            border-color: var(--brand);
+            color: var(--panel-contrast);
         }
 
         .close-panel-btn {
@@ -230,17 +261,36 @@
         }
 
         .close-panel-btn:hover {
-            background: #38bdf8;
+            background: var(--accent);
         }
 
         .close-panel-btn:hover svg path,
         .close-panel-btn:hover svg circle {
-            stroke: #0f172a;
+            stroke: var(--panel-contrast);
         }
 
         .close-panel-btn:hover svg path {
-            fill: #0f172a;
+            fill: var(--panel-contrast);
         }
+
+        /* Theme toggle */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 38px;
+            height: 38px;
+            border-radius: 9999px;
+            border: 1px solid var(--muted);
+            background: var(--panel);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            color: var(--muted);
+            transition: all 0.2s ease;
+        }
+        .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+        .theme-toggle svg { width: 20px; height: 20px; }
     </style>
 </head>
 <body>
@@ -249,6 +299,16 @@
             <path d="M19 21H5a1 1 0 0 1-1-1v-9H1l10.327-9.388a1 1 0 0 1 1.346 0L23 11h-3v9a1 1 0 0 1-1 1zm-6-2h5v-9.15L12 4.2l-6 5.65V19h5v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3z"/>
         </svg>
     </a>
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
+        <!-- Sun/Moon icon toggled via CSS/JS -->
+        <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+    </button>
     <div class="price-container">
         <div class="title">Bitcoin</div>
         <div class="price-display">
@@ -290,6 +350,50 @@
     <script>
         let currentCurrency = 'gbp';
         let displayMode = 'btc'; // 'btc' or 'sats'
+
+        // Theme bootstrap
+        const rootEl = document.documentElement;
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const iconSun = document.getElementById('iconSun');
+        const iconMoon = document.getElementById('iconMoon');
+
+        function getCssVar(name) {
+            return getComputedStyle(rootEl).getPropertyValue(name).trim();
+        }
+
+        function getThemeColors() {
+            return {
+                accent: getCssVar('--accent'),
+                grid: getCssVar('--grid'),
+                text: getCssVar('--text'),
+                muted: getCssVar('--muted'),
+                tooltipBg: getCssVar('--chart-tooltip-bg'),
+                tooltipBorder: getCssVar('--chart-tooltip-border'),
+            };
+        }
+
+        function applyTheme(theme) {
+            rootEl.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            // Toggle icons
+            const isLight = theme === 'light';
+            iconSun.style.display = isLight ? 'none' : '';
+            iconMoon.style.display = isLight ? '' : 'none';
+            // Update chart colors if chart exists
+            updateChartTheme();
+        }
+
+        function initTheme() {
+            const saved = localStorage.getItem('theme');
+            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+            const theme = saved || (prefersLight ? 'light' : 'dark');
+            applyTheme(theme);
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            const next = (rootEl.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
+            applyTheme(next);
+        });
 
         // Cache for API responses
         const cache = {
@@ -344,9 +448,9 @@
                     
                     if (displayMode === 'btc') {
                         priceElement.textContent = currencySymbol + price.toLocaleString(
-                            currentCurrency.toLowerCase() === 'gbp' ? 'en-GB' : 'en-US', 
-                            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                        );
+                        currentCurrency.toLowerCase() === 'gbp' ? 'en-GB' : 'en-US', 
+                        { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                    );
                         currencyElement.textContent = currentCurrency.toUpperCase();
                     } else {
                         // Sats mode: show sats per unit (rounded to whole number)
@@ -461,9 +565,9 @@
             }
             
             try {
-                chart.data.labels = data.prices.map(price => new Date(price[0]).toLocaleDateString());
-                chart.data.datasets[0].data = data.prices.map(price => price[1]);
-                chart.update();
+            chart.data.labels = data.prices.map(price => new Date(price[0]).toLocaleDateString());
+            chart.data.datasets[0].data = data.prices.map(price => price[1]);
+            chart.update();
                 console.log('Chart updated successfully');
             } catch (error) {
                 console.error('Error updating chart:', error);
@@ -471,6 +575,7 @@
         }
 
         // Initial load
+        initTheme();
         fetchBitcoinPrice();
         // Update price every 30 seconds
         setInterval(fetchBitcoinPrice, 30000);
@@ -511,6 +616,7 @@
 
             const ctx = document.getElementById('priceChart').getContext('2d');
             const currentRange = document.querySelector('.time-button.active')?.dataset.range;
+            const theme = getThemeColors();
             
             try {
                 console.log('Initializing chart with data:', data);
@@ -562,7 +668,7 @@
                         datasets: [{
                             label: 'Bitcoin Price (GBP)',
                             data: values,
-                            borderColor: '#38bdf8',
+                            borderColor: theme.accent,
                             backgroundColor: 'rgba(56, 189, 248, 0.1)',
                             borderWidth: 2,
                             fill: true,
@@ -586,11 +692,11 @@
                                 display: false
                             },
                             tooltip: {
-                                backgroundColor: '#1e293b',
-                                borderColor: '#38bdf8',
+                                backgroundColor: theme.tooltipBg,
+                                borderColor: theme.tooltipBorder,
                                 borderWidth: 1,
-                                titleColor: '#e2e8f0',
-                                bodyColor: '#e2e8f0',
+                                titleColor: theme.text,
+                                bodyColor: theme.text,
                                 displayColors: false,
                                 callbacks: {
                                     label: (context) => {
@@ -603,21 +709,21 @@
                         scales: {
                             x: {
                                 grid: {
-                                    color: 'rgba(148, 163, 184, 0.1)'
+                                    color: theme.grid
                                 },
                                 ticks: {
-                                    color: '#94a3b8',
+                                    color: theme.muted,
                                     maxRotation: 45,
                                     minRotation: 45
                                 }
                             },
                             y: {
                                 grid: {
-                                    color: 'rgba(148, 163, 184, 0.1)',
+                                    color: theme.grid,
                                     drawBorder: false
                                 },
                                 ticks: {
-                                    color: '#94a3b8',
+                                    color: theme.muted,
                                     callback: (value) => value >= 0 ? `£${value.toLocaleString()}` : '',
                                     padding: 5
                                 },
@@ -641,6 +747,25 @@
                 console.log('Chart initialized successfully');
             } catch (error) {
                 console.error('Error initializing chart:', error);
+            }
+        }
+
+        function updateChartTheme() {
+            if (!chart) return;
+            const theme = getThemeColors();
+            try {
+                chart.data.datasets[0].borderColor = theme.accent;
+                chart.options.plugins.tooltip.backgroundColor = theme.tooltipBg;
+                chart.options.plugins.tooltip.borderColor = theme.tooltipBorder;
+                chart.options.plugins.tooltip.titleColor = theme.text;
+                chart.options.plugins.tooltip.bodyColor = theme.text;
+                chart.options.scales.x.ticks.color = theme.muted;
+                chart.options.scales.y.ticks.color = theme.muted;
+                chart.options.scales.x.grid.color = theme.grid;
+                chart.options.scales.y.grid.color = theme.grid;
+                chart.update('none');
+            } catch (e) {
+                console.error('Failed to update chart theme', e);
             }
         }
 
