@@ -385,6 +385,17 @@
             throw lastErr;
         }
 
+        // Helper: cache + retry wrapper
+        async function fetchWithCacheRetry(url, cacheKey, retries = 2, backoffMs = 800) {
+            const now = Date.now();
+            if (cache[cacheKey] && (now - cache[cacheKey].timestamp) < CACHE_DURATION) {
+                return cache[cacheKey].data;
+            }
+            const data = await fetchJsonWithRetry(url, retries, backoffMs);
+            cache[cacheKey] = { data, timestamp: now };
+            return data;
+        }
+
         async function fetchNetworkData(timeRange = currentTimeRange) {
             try {
                 // show loaders and clear errors
@@ -397,25 +408,24 @@
                 [uE,mE,nE].forEach(el => el && el.classList.remove('show'));
                 [uL,mL,nL].forEach(el => el && el.classList.add('active'));
 
-                const [usersData, minersData, nodesResponse] = await Promise.all([
-                    // retry wrappers
-                    (async () => {
-                        try { return await fetchJsonWithRetry(`https://api.blockchain.info/charts/n-unique-addresses?timespan=${timeRange}&format=json&cors=true`, 2, 700); }
-                        catch (e) { console.error('users fetch failed', e); return null; }
-                    })(),
-                    (async () => {
-                        try { return await fetchJsonWithRetry('https://api.blockchain.info/pools?timespan=5days', 2, 700); }
-                        catch (e) { console.error('miners fetch failed', e); return null; }
-                    })(),
-                    (async () => {
-                        try { return await fetchJsonWithRetry('https://bitnodes.io/api/v1/snapshots/latest/', 2, 700); }
-                        catch (e) { console.error('nodes fetch failed', e); return null; }
-                    })()
+                const [usersData, minersData, nodesData] = await Promise.all([
+                    fetchWithCacheRetry(
+                        `https://api.blockchain.info/charts/n-unique-addresses?timespan=${timeRange}&format=json&cors=true`,
+                        `users-${timeRange}`
+                    ).catch(e => { console.error('users fetch failed', e); return null; }),
+                    fetchWithCacheRetry(
+                        'https://api.blockchain.info/pools?timespan=5days',
+                        'miners-5days'
+                    ).catch(e => { console.error('miners fetch failed', e); return null; }),
+                    fetchWithCacheRetry(
+                        'https://bitnodes.io/api/v1/snapshots/latest/',
+                        'nodes-latest'
+                    ).catch(e => { console.error('nodes fetch failed', e); return null; })
                 ]);
 
                 if (usersData) updateUsersVisualization(usersData); else uE && uE.classList.add('show');
                 if (minersData) updateMinersVisualization(minersData); else mE && mE.classList.add('show');
-                if (nodesResponse) updateNodesVisualization(nodesResponse); else nE && nE.classList.add('show');
+                if (nodesData) updateNodesVisualization(nodesData); else nE && nE.classList.add('show');
             } catch (error) {
                 console.error('Error in fetchNetworkData:', error);
             } finally {
