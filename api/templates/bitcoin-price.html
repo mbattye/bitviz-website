@@ -5,37 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Price</title>
     <style>
-        /* Theme variables */
+        /* Step 1: theme variables with current dark defaults */
         :root {
-            --bg: #0f172a;
-            --text: #e2e8f0;
-            --muted: #94a3b8;
-            --panel: #1e293b;
-            --panel-contrast: #0f172a;
-            --accent: #38bdf8; /* cyan */
-            --brand: #f7931a;  /* bitcoin orange */
+            --bg: #0f172a;        /* body background */
+            --text: #e2e8f0;      /* body text */
+            --muted: #94a3b8;     /* secondary text */
+            --accent: #38bdf8;    /* cyan */
+            --brand: #f7931a;     /* bitcoin orange */
+            --panel: #1e293b;     /* panel bg */
+            --panel-contrast: #0f172a; /* text-on-accent bg */
             --positive: #4ade80;
             --negative: #f87171;
             --grid: rgba(148, 163, 184, 0.1);
-            --chart-tooltip-bg: #1e293b;
-            --chart-tooltip-border: #38bdf8;
         }
 
+        /* Step 3: light theme palette */
         :root[data-theme="light"] {
-            --bg: #f8fafc; /* slate-50 */
-            --text: #0f172a; /* slate-900 */
-            --muted: #475569; /* slate-600 */
+            --bg: #f8fafc;          /* slate-50 */
+            --text: #0f172a;        /* slate-900 */
+            --muted: #475569;       /* slate-600 */
+            --accent: #0ea5e9;      /* sky-500 */
+            --brand: #f7931a;       /* bitcoin orange */
             --panel: #ffffff;
             --panel-contrast: #ffffff;
-            --accent: #0ea5e9; /* sky-500 */
-            --brand: #f7931a;
             --positive: #16a34a;
             --negative: #dc2626;
-            --grid: rgba(100, 116, 139, 0.15);
-            --chart-tooltip-bg: #ffffff;
-            --chart-tooltip-border: #0ea5e9;
+            --grid: rgba(100,116,139,0.15);
         }
-
         body {
             background-color: var(--bg);
             color: var(--text);
@@ -114,6 +110,25 @@
         .home-button:hover svg {
             fill: var(--brand);
         }
+
+        /* Minimal theme toggle button */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 36px;
+            height: 36px;
+            border-radius: 9999px;
+            border: 1px solid var(--muted);
+            background: var(--panel);
+            color: var(--muted);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+        .theme-toggle svg { width: 18px; height: 18px; }
 
         .price-container {
             position: relative;
@@ -195,7 +210,29 @@
         .graph-container {
             padding: 2rem;
             height: 100%;
+            position: relative;
         }
+
+        /* Minimal loader for the chart area */
+        .chart-loader {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            pointer-events: none;
+        }
+        .chart-loader.active { display: flex; }
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--muted);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .graph-controls {
             display: flex;
@@ -261,36 +298,17 @@
         }
 
         .close-panel-btn:hover {
-            background: var(--accent);
+            background: #38bdf8;
         }
 
         .close-panel-btn:hover svg path,
         .close-panel-btn:hover svg circle {
-            stroke: var(--panel-contrast);
+            stroke: #0f172a;
         }
 
         .close-panel-btn:hover svg path {
-            fill: var(--panel-contrast);
+            fill: #0f172a;
         }
-
-        /* Theme toggle */
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 38px;
-            height: 38px;
-            border-radius: 9999px;
-            border: 1px solid var(--muted);
-            background: var(--panel);
-            display: grid;
-            place-items: center;
-            cursor: pointer;
-            color: var(--muted);
-            transition: all 0.2s ease;
-        }
-        .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
-        .theme-toggle svg { width: 20px; height: 20px; }
     </style>
 </head>
 <body>
@@ -299,8 +317,9 @@
             <path d="M19 21H5a1 1 0 0 1-1-1v-9H1l10.327-9.388a1 1 0 0 1 1.346 0L23 11h-3v9a1 1 0 0 1-1 1zm-6-2h5v-9.15L12 4.2l-6 5.65V19h5v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3z"/>
         </svg>
     </a>
+    <!-- Step 3: Theme toggle control -->
     <button id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
-        <!-- Sun/Moon icon toggled via CSS/JS -->
+        <!-- Sun icon (shown in dark), Moon icon (shown in light) -->
         <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="5"></circle>
             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
@@ -341,6 +360,7 @@
                     <button class="time-button" data-range="ALL">ALL</button>
                 </div>
             </div>
+            <div id="chartLoader" class="chart-loader"><div class="spinner"></div></div>
             <canvas id="priceChart"></canvas>
         </div>
     </div>
@@ -351,49 +371,40 @@
         let currentCurrency = 'gbp';
         let displayMode = 'btc'; // 'btc' or 'sats'
 
-        // Theme bootstrap
-        const rootEl = document.documentElement;
-        const themeToggleBtn = document.getElementById('themeToggle');
-        const iconSun = document.getElementById('iconSun');
-        const iconMoon = document.getElementById('iconMoon');
-
-        function getCssVar(name) {
-            return getComputedStyle(rootEl).getPropertyValue(name).trim();
-        }
-
-        function getThemeColors() {
-            return {
-                accent: getCssVar('--accent'),
-                grid: getCssVar('--grid'),
-                text: getCssVar('--text'),
-                muted: getCssVar('--muted'),
-                tooltipBg: getCssVar('--chart-tooltip-bg'),
-                tooltipBorder: getCssVar('--chart-tooltip-border'),
-            };
-        }
-
-        function applyTheme(theme) {
-            rootEl.setAttribute('data-theme', theme);
-            localStorage.setItem('theme', theme);
-            // Toggle icons
-            const isLight = theme === 'light';
-            iconSun.style.display = isLight ? 'none' : '';
-            iconMoon.style.display = isLight ? '' : 'none';
-            // Update chart colors if chart exists
-            updateChartTheme();
-        }
-
-        function initTheme() {
+        // Step 3: Minimal theme init and toggle (no chart bindings yet)
+        (function initTheme() {
+            const root = document.documentElement;
             const saved = localStorage.getItem('theme');
             const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-            const theme = saved || (prefersLight ? 'light' : 'dark');
-            applyTheme(theme);
-        }
+            const initial = saved || (prefersLight ? 'light' : 'dark');
+            root.setAttribute('data-theme', initial);
+            const iconSun = document.getElementById('iconSun');
+            const iconMoon = document.getElementById('iconMoon');
+            if (iconSun && iconMoon) {
+                const isLight = initial === 'light';
+                iconSun.style.display = isLight ? 'none' : '';
+                iconMoon.style.display = isLight ? '' : 'none';
+            }
+        })();
 
-        themeToggleBtn.addEventListener('click', () => {
-            const next = (rootEl.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
-            applyTheme(next);
-        });
+        (function wireThemeToggle(){
+            const btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                const root = document.documentElement;
+                const current = root.getAttribute('data-theme') || 'dark';
+                const next = current === 'light' ? 'dark' : 'light';
+                root.setAttribute('data-theme', next);
+                localStorage.setItem('theme', next);
+                const iconSun = document.getElementById('iconSun');
+                const iconMoon = document.getElementById('iconMoon');
+                if (iconSun && iconMoon) {
+                    const isLight = next === 'light';
+                    iconSun.style.display = isLight ? 'none' : '';
+                    iconMoon.style.display = isLight ? '' : 'none';
+                }
+            });
+        })();
 
         // Cache for API responses
         const cache = {
@@ -448,9 +459,9 @@
                     
                     if (displayMode === 'btc') {
                         priceElement.textContent = currencySymbol + price.toLocaleString(
-                        currentCurrency.toLowerCase() === 'gbp' ? 'en-GB' : 'en-US', 
-                        { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                    );
+                            currentCurrency.toLowerCase() === 'gbp' ? 'en-GB' : 'en-US', 
+                            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                        );
                         currencyElement.textContent = currentCurrency.toUpperCase();
                     } else {
                         // Sats mode: show sats per unit (rounded to whole number)
@@ -524,13 +535,27 @@
             });
         });
 
+        // AbortController for chart requests
+        let chartAbortController = null;
+
         // Modified chart data fetching
         async function fetchChartData(range) {
             console.log(`fetchChartData called with range: ${range}`);
             
             try {
+                // Abort any in-flight request
+                if (chartAbortController) {
+                    chartAbortController.abort();
+                }
+                chartAbortController = new AbortController();
+                const { signal } = chartAbortController;
+
+                // show loader
+                const loader = document.getElementById('chartLoader');
+                if (loader) loader.classList.add('active');
+
                 const url = `/api/bitcoin-historical/${range}`;
-                const response = await fetch(url);
+                const response = await fetch(url, { signal });
                 console.log(`Response status: ${response.status}`);
                 
                 if (!response.ok) {
@@ -552,8 +577,15 @@
 
                 return data;
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Chart request aborted');
+                    return null;
+                }
                 console.error(`Error fetching ${range} data:`, error);
                 return null;
+            } finally {
+                const loader = document.getElementById('chartLoader');
+                if (loader) loader.classList.remove('active');
             }
         }
 
@@ -565,9 +597,9 @@
             }
             
             try {
-            chart.data.labels = data.prices.map(price => new Date(price[0]).toLocaleDateString());
-            chart.data.datasets[0].data = data.prices.map(price => price[1]);
-            chart.update();
+                chart.data.labels = data.prices.map(price => new Date(price[0]).toLocaleDateString());
+                chart.data.datasets[0].data = data.prices.map(price => price[1]);
+                chart.update();
                 console.log('Chart updated successfully');
             } catch (error) {
                 console.error('Error updating chart:', error);
@@ -575,7 +607,6 @@
         }
 
         // Initial load
-        initTheme();
         fetchBitcoinPrice();
         // Update price every 30 seconds
         setInterval(fetchBitcoinPrice, 30000);
@@ -616,7 +647,6 @@
 
             const ctx = document.getElementById('priceChart').getContext('2d');
             const currentRange = document.querySelector('.time-button.active')?.dataset.range;
-            const theme = getThemeColors();
             
             try {
                 console.log('Initializing chart with data:', data);
@@ -668,7 +698,7 @@
                         datasets: [{
                             label: 'Bitcoin Price (GBP)',
                             data: values,
-                            borderColor: theme.accent,
+                            borderColor: '#38bdf8',
                             backgroundColor: 'rgba(56, 189, 248, 0.1)',
                             borderWidth: 2,
                             fill: true,
@@ -692,11 +722,11 @@
                                 display: false
                             },
                             tooltip: {
-                                backgroundColor: theme.tooltipBg,
-                                borderColor: theme.tooltipBorder,
+                                backgroundColor: '#1e293b',
+                                borderColor: '#38bdf8',
                                 borderWidth: 1,
-                                titleColor: theme.text,
-                                bodyColor: theme.text,
+                                titleColor: '#e2e8f0',
+                                bodyColor: '#e2e8f0',
                                 displayColors: false,
                                 callbacks: {
                                     label: (context) => {
@@ -709,21 +739,21 @@
                         scales: {
                             x: {
                                 grid: {
-                                    color: theme.grid
+                                    color: 'rgba(148, 163, 184, 0.1)'
                                 },
                                 ticks: {
-                                    color: theme.muted,
+                                    color: '#94a3b8',
                                     maxRotation: 45,
                                     minRotation: 45
                                 }
                             },
                             y: {
                                 grid: {
-                                    color: theme.grid,
+                                    color: 'rgba(148, 163, 184, 0.1)',
                                     drawBorder: false
                                 },
                                 ticks: {
-                                    color: theme.muted,
+                                    color: '#94a3b8',
                                     callback: (value) => value >= 0 ? `£${value.toLocaleString()}` : '',
                                     padding: 5
                                 },
@@ -747,25 +777,6 @@
                 console.log('Chart initialized successfully');
             } catch (error) {
                 console.error('Error initializing chart:', error);
-            }
-        }
-
-        function updateChartTheme() {
-            if (!chart) return;
-            const theme = getThemeColors();
-            try {
-                chart.data.datasets[0].borderColor = theme.accent;
-                chart.options.plugins.tooltip.backgroundColor = theme.tooltipBg;
-                chart.options.plugins.tooltip.borderColor = theme.tooltipBorder;
-                chart.options.plugins.tooltip.titleColor = theme.text;
-                chart.options.plugins.tooltip.bodyColor = theme.text;
-                chart.options.scales.x.ticks.color = theme.muted;
-                chart.options.scales.y.ticks.color = theme.muted;
-                chart.options.scales.x.grid.color = theme.grid;
-                chart.options.scales.y.grid.color = theme.grid;
-                chart.update('none');
-            } catch (e) {
-                console.error('Failed to update chart theme', e);
             }
         }
 
