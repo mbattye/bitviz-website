@@ -5,9 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Price</title>
     <style>
+        /* Step 1: theme variables with current dark defaults */
+        :root {
+            --bg: #0f172a;        /* body background */
+            --text: #e2e8f0;      /* body text */
+            --muted: #94a3b8;     /* secondary text */
+            --accent: #38bdf8;    /* cyan */
+            --brand: #f7931a;     /* bitcoin orange */
+            --panel: #1e293b;     /* panel bg */
+            --panel-contrast: #0f172a; /* text-on-accent bg */
+            --positive: #4ade80;
+            --negative: #f87171;
+            --grid: rgba(148, 163, 184, 0.1);
+        }
+
+        /* Step 3: light theme palette */
+        :root[data-theme="light"] {
+            --bg: #f8fafc;          /* slate-50 */
+            --text: #0f172a;        /* slate-900 */
+            --muted: #475569;       /* slate-600 */
+            --accent: #0ea5e9;      /* sky-500 */
+            --brand: #f7931a;       /* bitcoin orange */
+            --panel: #ffffff;
+            --panel-contrast: #ffffff;
+            --positive: #16a34a;
+            --negative: #dc2626;
+            --grid: rgba(100,116,139,0.15);
+        }
         body {
-            background-color: #0f172a;
-            color: #e2e8f0;
+            background-color: var(--bg);
+            color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             display: flex;
             justify-content: center;
@@ -24,18 +51,18 @@
             font-size: 3.5rem;
             font-weight: 700;
             margin: 1rem 0;
-            color: #38bdf8;
+            color: var(--accent);
         }
 
         .currency {
             font-size: 1.5rem;
-            color: #94a3b8;
+            color: var(--muted);
             cursor: pointer;
             user-select: none;
         }
 
         .currency:hover {
-            color: #38bdf8;
+            color: var(--accent);
         }
 
         .change {
@@ -44,23 +71,23 @@
         }
 
         .positive {
-            color: #4ade80;
+            color: var(--positive);
         }
 
         .negative {
-            color: #f87171;
+            color: var(--negative);
         }
 
         .title {
             font-size: 1.5rem;
-            color: #94a3b8;
+            color: var(--muted);
             margin-bottom: 0.5rem;
             cursor: pointer;
             transition: color 0.2s ease;
         }
 
         .title:hover {
-            color: #f7931a;
+            color: var(--brand);
         }
 
         .home-button {
@@ -76,13 +103,32 @@
         .home-button svg {
             width: 28px;
             height: 28px;
-            fill: #94a3b8;
+            fill: var(--muted);
             transition: fill 0.3s;
         }
 
         .home-button:hover svg {
-            fill: #f7931a;
+            fill: var(--brand);
         }
+
+        /* Minimal theme toggle button */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 36px;
+            height: 36px;
+            border-radius: 9999px;
+            border: 1px solid var(--muted);
+            background: var(--panel);
+            color: var(--muted);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+        .theme-toggle svg { width: 18px; height: 18px; }
 
         .price-container {
             position: relative;
@@ -99,7 +145,7 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 20;
-            background-color: #0f172a;
+            background-color: var(--bg);
             padding: 20px;
             border-radius: 8px;
         }
@@ -110,9 +156,9 @@
             left: 0;
             width: 100%;
             height: 80vh;
-            background-color: #1e293b;
+            background-color: var(--panel);
             transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            border-top: 1px solid #38bdf8;
+            border-top: 1px solid var(--accent);
             box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);
             z-index: 10;
         }
@@ -126,13 +172,13 @@
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #1e293b;
+            background-color: var(--panel);
             padding: 8px 16px;
             border-radius: 8px 8px 0 0;
-            border: 1px solid #38bdf8;
+            border: 1px solid var(--accent);
             border-bottom: none;
             cursor: pointer;
-            color: #38bdf8;
+            color: var(--accent);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -141,8 +187,8 @@
         }
 
         .panel-tab:hover {
-            background-color: #38bdf8;
-            color: #0f172a;
+            background-color: var(--accent);
+            color: var(--panel-contrast);
         }
 
         .panel-tab svg {
@@ -164,7 +210,29 @@
         .graph-container {
             padding: 2rem;
             height: 100%;
+            position: relative;
         }
+
+        /* Minimal loader for the chart area */
+        .chart-loader {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            pointer-events: none;
+        }
+        .chart-loader.active { display: flex; }
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--muted);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .graph-controls {
             display: flex;
@@ -181,7 +249,7 @@
         #priceChart {
             width: 100%;
             height: calc(100% - 100px);
-            background-color: #1e293b;
+            background-color: var(--panel);
         }
 
         .time-range-buttons {
@@ -189,9 +257,9 @@
         }
 
         .time-button {
-            background: #1e293b;
-            border: 1px solid #94a3b8;
-            color: #94a3b8;
+            background: var(--panel);
+            border: 1px solid var(--muted);
+            color: var(--muted);
             padding: 0.5rem 1rem;
             border-radius: 4px;
             cursor: pointer;
@@ -200,14 +268,14 @@
         }
 
         .time-button:hover {
-            border-color: #f7931a;
-            color: #f7931a;
+            border-color: var(--brand);
+            color: var(--brand);
         }
 
         .time-button.active {
-            background: #f7931a;
-            border-color: #f7931a;
-            color: #0f172a;
+            background: var(--brand);
+            border-color: var(--brand);
+            color: var(--panel-contrast);
         }
 
         .close-panel-btn {
@@ -249,6 +317,17 @@
             <path d="M19 21H5a1 1 0 0 1-1-1v-9H1l10.327-9.388a1 1 0 0 1 1.346 0L23 11h-3v9a1 1 0 0 1-1 1zm-6-2h5v-9.15L12 4.2l-6 5.65V19h5v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3z"/>
         </svg>
     </a>
+    <!-- Step 3: Theme toggle control -->
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
+        <!-- Sun icon (shown in dark), Moon icon (shown in light) -->
+        <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+    </button>
     <div class="price-container">
         <div class="title">Bitcoin</div>
         <div class="price-display">
@@ -281,6 +360,7 @@
                     <button class="time-button" data-range="ALL">ALL</button>
                 </div>
             </div>
+            <div id="chartLoader" class="chart-loader"><div class="spinner"></div></div>
             <canvas id="priceChart"></canvas>
         </div>
     </div>
@@ -290,6 +370,41 @@
     <script>
         let currentCurrency = 'gbp';
         let displayMode = 'btc'; // 'btc' or 'sats'
+
+        // Step 3: Minimal theme init and toggle (no chart bindings yet)
+        (function initTheme() {
+            const root = document.documentElement;
+            const saved = localStorage.getItem('theme');
+            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+            const initial = saved || (prefersLight ? 'light' : 'dark');
+            root.setAttribute('data-theme', initial);
+            const iconSun = document.getElementById('iconSun');
+            const iconMoon = document.getElementById('iconMoon');
+            if (iconSun && iconMoon) {
+                const isLight = initial === 'light';
+                iconSun.style.display = isLight ? 'none' : '';
+                iconMoon.style.display = isLight ? '' : 'none';
+            }
+        })();
+
+        (function wireThemeToggle(){
+            const btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                const root = document.documentElement;
+                const current = root.getAttribute('data-theme') || 'dark';
+                const next = current === 'light' ? 'dark' : 'light';
+                root.setAttribute('data-theme', next);
+                localStorage.setItem('theme', next);
+                const iconSun = document.getElementById('iconSun');
+                const iconMoon = document.getElementById('iconMoon');
+                if (iconSun && iconMoon) {
+                    const isLight = next === 'light';
+                    iconSun.style.display = isLight ? 'none' : '';
+                    iconMoon.style.display = isLight ? '' : 'none';
+                }
+            });
+        })();
 
         // Cache for API responses
         const cache = {
@@ -420,13 +535,27 @@
             });
         });
 
+        // AbortController for chart requests
+        let chartAbortController = null;
+
         // Modified chart data fetching
         async function fetchChartData(range) {
             console.log(`fetchChartData called with range: ${range}`);
             
             try {
+                // Abort any in-flight request
+                if (chartAbortController) {
+                    chartAbortController.abort();
+                }
+                chartAbortController = new AbortController();
+                const { signal } = chartAbortController;
+
+                // show loader
+                const loader = document.getElementById('chartLoader');
+                if (loader) loader.classList.add('active');
+
                 const url = `/api/bitcoin-historical/${range}`;
-                const response = await fetch(url);
+                const response = await fetch(url, { signal });
                 console.log(`Response status: ${response.status}`);
                 
                 if (!response.ok) {
@@ -448,8 +577,15 @@
 
                 return data;
             } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Chart request aborted');
+                    return null;
+                }
                 console.error(`Error fetching ${range} data:`, error);
                 return null;
+            } finally {
+                const loader = document.getElementById('chartLoader');
+                if (loader) loader.classList.remove('active');
             }
         }
 

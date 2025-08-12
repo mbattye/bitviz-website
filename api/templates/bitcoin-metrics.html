@@ -6,9 +6,26 @@
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
     <script src="https://unpkg.com/topojson@3"></script>
     <style>
+        /* Theme variables */
+        :root {
+            --bg: #0f172a;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --panel: #1e293b;
+            --brand: #f7931a;
+        }
+
+        :root[data-theme="light"] {
+            --bg: #f8fafc;
+            --text: #0f172a;
+            --muted: #475569;
+            --panel: #ffffff;
+            --brand: #f7931a;
+        }
+
         body {
-            background-color: #0f172a;
-            color: #94a3b8;
+            background-color: var(--bg);
+            color: var(--muted);
             font-family: system-ui, -apple-system, sans-serif;
         }
 
@@ -20,13 +37,13 @@
 
         .title {
             font-size: 1.5rem;
-            color: #94a3b8;
+            color: var(--muted);
             margin-bottom: 2rem;
             transition: color 0.2s ease;
         }
 
         .title:hover {
-            color: #f7931a;
+            color: var(--brand);
             cursor: pointer;
         }
 
@@ -37,7 +54,7 @@
         }
 
         .metric-card {
-            background: #1e293b;
+            background: var(--panel);
             border-radius: 12px;
             padding: 1.5rem;
             transition: transform 0.2s ease;
@@ -61,9 +78,9 @@
         }
 
         .time-button {
-            background: #1e293b;
-            border: 1px solid #94a3b8;
-            color: #94a3b8;
+            background: var(--panel);
+            border: 1px solid var(--muted);
+            color: var(--muted);
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
             cursor: pointer;
@@ -72,13 +89,13 @@
         }
 
         .time-button:hover {
-            border-color: #f7931a;
-            color: #f7931a;
+            border-color: var(--brand);
+            color: var(--brand);
         }
 
         .time-button.active {
-            background: #f7931a;
-            border-color: #f7931a;
+            background: var(--brand);
+            border-color: var(--brand);
             color: #0f172a;
         }
 
@@ -110,7 +127,7 @@
             padding: 8px;
             background: #334155;
             border-radius: 4px;
-            color: #94a3b8;
+            color: var(--muted);
             font-size: 0.875rem;
             pointer-events: none;
             opacity: 0;
@@ -172,13 +189,30 @@
         .home-button svg {
             width: 28px;
             height: 28px;
-            fill: #94a3b8;
+            fill: var(--muted);
             transition: fill 0.3s;
         }
 
-        .home-button:hover svg {
-            fill: #f7931a;
+        .home-button:hover svg { fill: var(--brand); }
+
+        /* Theme toggle */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 36px;
+            height: 36px;
+            border-radius: 9999px;
+            border: 1px solid var(--muted);
+            background: var(--panel);
+            color: var(--muted);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
+        .theme-toggle:hover { border-color: var(--brand); color: var(--brand); }
+        .theme-toggle svg { width: 18px; height: 18px; }
     </style>
 </head>
 <body>
@@ -188,7 +222,19 @@
         </svg>
     </a>
     <div class="container">
-        <h1 class="title">Bitcoin Network Metrics</h1>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:1rem;">
+            <h1 class="title" style="margin:0">Bitcoin Network Metrics</h1>
+            <!-- Theme toggle (inline in header) -->
+            <button id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme" style="position:static;">
+                <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+                <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
+        </div>
         <div class="metrics-grid">
             <div class="metric-card users">
                 <div class="metric-header">
@@ -218,6 +264,41 @@
     </div>
 
     <script>
+        // Minimal theme init and toggle
+        (function initTheme() {
+            const root = document.documentElement;
+            const saved = localStorage.getItem('theme');
+            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+            const initial = saved || (prefersLight ? 'light' : 'dark');
+            root.setAttribute('data-theme', initial);
+            const iconSun = document.getElementById('iconSun');
+            const iconMoon = document.getElementById('iconMoon');
+            if (iconSun && iconMoon) {
+                const isLight = initial === 'light';
+                iconSun.style.display = isLight ? 'none' : '';
+                iconMoon.style.display = isLight ? '' : 'none';
+            }
+        })();
+
+        (function wireThemeToggle(){
+            const btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                const root = document.documentElement;
+                const current = root.getAttribute('data-theme') || 'dark';
+                const next = current === 'light' ? 'dark' : 'light';
+                root.setAttribute('data-theme', next);
+                localStorage.setItem('theme', next);
+                const iconSun = document.getElementById('iconSun');
+                const iconMoon = document.getElementById('iconMoon');
+                if (iconSun && iconMoon) {
+                    const isLight = next === 'light';
+                    iconSun.style.display = isLight ? 'none' : '';
+                    iconMoon.style.display = isLight ? '' : 'none';
+                }
+            });
+        })();
+
         let currentTimeRange = '30days';
 
         // Cache for API responses to handle rate limiting
