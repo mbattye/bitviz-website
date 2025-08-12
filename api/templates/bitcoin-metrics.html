@@ -13,6 +13,8 @@
             --muted: #94a3b8;
             --panel: #1e293b;
             --brand: #f7931a;
+            --tooltip-bg: #334155;
+            --tooltip-text: #e2e8f0;
         }
 
         :root[data-theme="light"] {
@@ -21,6 +23,8 @@
             --muted: #475569;
             --panel: #ffffff;
             --brand: #f7931a;
+            --tooltip-bg: #ffffff;
+            --tooltip-text: #0f172a;
         }
 
         body {
@@ -126,9 +130,7 @@
             width: 100%;
         }
 
-        .visualization.users-viz {
-            height: 170px;
-        }
+        .visualization.users-viz { height: 300px; }
 
         .visualization.miners-viz {
             height: 400px;
@@ -148,9 +150,11 @@
         .tooltip {
             position: absolute;
             padding: 8px;
-            background: #334155;
+            background: var(--tooltip-bg);
             border-radius: 4px;
-            color: var(--muted);
+            color: var(--tooltip-text);
+            border: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
             font-size: 0.875rem;
             pointer-events: none;
             opacity: 0;
@@ -181,10 +185,7 @@
             pointer-events: none;
         }
 
-        .metric-card.users {
-            height: 250px;
-            margin-bottom: 2rem;
-        }
+        .metric-card.users { height: 360px; margin-bottom: 2rem; }
 
         .metric-card.miners {
             height: 500px;
@@ -585,43 +586,14 @@
                 .attr('fill', d => {
                     const cellWidth = d.x1 - d.x0;
                     const cellHeight = d.y1 - d.y0;
-                    
-                    // Debug logs
-                    console.log('Cell dimensions:', {
-                        width: cellWidth,
-                        height: cellHeight,
-                        data: d.data[0],
-                        index: root.leaves().indexOf(d)
-                    });
-                    
                     if (cellWidth < 60 || cellHeight < 30) return 'transparent';
-                    
-                    // Get the index of this box in size order
-                    const index = root.leaves().indexOf(d);
-                    const color = (index % 10 < 2) ? '#1e293b' : '#ffffff';
-                    
-                    // Debug log
-                    console.log('Text color:', {
-                        name: d.data[0],
-                        index: index,
-                        color: color
-                    });
-                    
-                    return color;
+                    const isLight = (document.documentElement.getAttribute('data-theme') === 'light');
+                    return isLight ? '#0f172a' : '#ffffff';
                 })
                 .text(d => {
                     const cellWidth = d.x1 - d.x0;
                     const cellHeight = d.y1 - d.y0;
                     const text = cellWidth < 60 || cellHeight < 30 ? '' : d.data.name;
-                    
-                    // Debug log
-                    console.log('Text content:', {
-                        name: d.data[0],
-                        width: cellWidth,
-                        height: cellHeight,
-                        text: text
-                    });
-                    
                     return text;
                 });
 
