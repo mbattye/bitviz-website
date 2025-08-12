@@ -15,6 +15,8 @@
             --brand: #f7931a;
             --tooltip-bg: #334155;
             --tooltip-text: #e2e8f0;
+            --map-fill: #1e293b;
+            --map-stroke: #94a3b8;
         }
 
         :root[data-theme="light"] {
@@ -25,6 +27,8 @@
             --brand: #f7931a;
             --tooltip-bg: #ffffff;
             --tooltip-text: #0f172a;
+            --map-fill: #e2e8f0;   /* slate-200 for land */
+            --map-stroke: #94a3b8; /* slate-400 for borders */
         }
 
         body {
@@ -182,6 +186,9 @@
         .treemap-label {
             font-size: 12px;
             fill: #fff;
+            paint-order: stroke fill;
+            stroke-width: 2px;
+            stroke: rgba(0,0,0,0.35);
             pointer-events: none;
         }
 
@@ -587,8 +594,16 @@
                     const cellWidth = d.x1 - d.x0;
                     const cellHeight = d.y1 - d.y0;
                     if (cellWidth < 60 || cellHeight < 30) return 'transparent';
-                    const isLight = (document.documentElement.getAttribute('data-theme') === 'light');
-                    return isLight ? '#0f172a' : '#ffffff';
+                    const fill = d3.color(colorScale(d.data.name));
+                    if (!fill) return '#0f172a';
+                    const brightness = (fill.r * 299 + fill.g * 587 + fill.b * 114) / 1000;
+                    return brightness > 150 ? '#0f172a' : '#ffffff';
+                })
+                .attr('stroke', d => {
+                    const fill = d3.color(colorScale(d.data.name));
+                    if (!fill) return 'rgba(0,0,0,0.35)';
+                    const brightness = (fill.r * 299 + fill.g * 587 + fill.b * 114) / 1000;
+                    return brightness > 150 ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)';
                 })
                 .text(d => {
                     const cellWidth = d.x1 - d.x0;
@@ -646,8 +661,8 @@
                     .selectAll("path")
                     .data(topojson.feature(worldData, worldData.objects.countries).features)
                     .join("path")
-                    .attr("fill", "#1e293b")
-                    .attr("stroke", "#94a3b8")
+                    .attr("fill", getCssVar('--map-fill'))
+                    .attr("stroke", getCssVar('--map-stroke'))
                     .attr("stroke-width", 0.5)
                     .attr("d", path);
 
@@ -683,9 +698,9 @@
                         return projectedCoords ? projectedCoords[1] : null;
                     })
                     .attr("r", 3)
-                    .attr("fill", "#f7931a")
+                    .attr("fill", getCssVar('--brand'))
                     .attr("opacity", 0.6)
-                    .attr("stroke", "#ffffff")
+                    .attr("stroke", getCssVar('--panel'))
                     .attr("stroke-width", 0.5);
 
                 // Add hover effects
