@@ -61,6 +61,24 @@
             position: relative;
         }
 
+        /* Loaders and errors */
+        .metric-loader,
+        .metric-error {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1rem;
+        }
+        .metric-loader { pointer-events: none; }
+        .metric-loader.active,
+        .metric-error.show { display: flex; }
+        .spinner { width: 26px; height: 26px; border: 3px solid var(--muted); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .metric-error { color: var(--muted); }
+
         .metric-card:hover {
             transform: translateY(-5px);
         }
@@ -98,6 +116,10 @@
             border-color: var(--brand);
             color: #0f172a;
         }
+
+        /* Focus styles */
+        .time-button:focus-visible,
+        .theme-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
 
         .visualization {
             width: 100%;
@@ -246,18 +268,24 @@
                         <button class="time-button" data-range="all">All</button>
                     </div>
                 </div>
+                <div id="users-loader" class="metric-loader"><div class="spinner"></div></div>
+                <div id="users-error" class="metric-error">Unable to load users data. Please try again.</div>
                 <div id="users-viz" class="visualization users-viz"></div>
             </div>
             <div class="metric-card miners">
                 <div class="metric-header">
                     <h2>Mining Distribution</h2>
                 </div>
+                <div id="miners-loader" class="metric-loader"><div class="spinner"></div></div>
+                <div id="miners-error" class="metric-error">Unable to load mining data. Please try again.</div>
                 <div id="miners-viz" class="visualization miners-viz"></div>
             </div>
             <div class="metric-card nodes">
                 <div class="metric-header">
                     <h2>Network Nodes</h2>
                 </div>
+                <div id="nodes-loader" class="metric-loader"><div class="spinner"></div></div>
+                <div id="nodes-error" class="metric-error">Unable to load nodes map. Please try again.</div>
                 <div id="nodes-viz" class="visualization nodes-viz"></div>
             </div>
         </div>
@@ -329,30 +357,63 @@
             }
         }
 
+        // Helper: retry with backoff
+        async function fetchJsonWithRetry(url, retries = 2, backoffMs = 800) {
+            let lastErr;
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    return await resp.json();
+                } catch (err) {
+                    lastErr = err;
+                    if (attempt < retries) {
+                        await new Promise(r => setTimeout(r, backoffMs * Math.pow(2, attempt)));
+                        continue;
+                    }
+                }
+            }
+            throw lastErr;
+        }
+
         async function fetchNetworkData(timeRange = currentTimeRange) {
             try {
+                // show loaders and clear errors
+                const uL = document.getElementById('users-loader');
+                const mL = document.getElementById('miners-loader');
+                const nL = document.getElementById('nodes-loader');
+                const uE = document.getElementById('users-error');
+                const mE = document.getElementById('miners-error');
+                const nE = document.getElementById('nodes-error');
+                [uE,mE,nE].forEach(el => el && el.classList.remove('show'));
+                [uL,mL,nL].forEach(el => el && el.classList.add('active'));
+
                 const [usersData, minersData, nodesResponse] = await Promise.all([
-                    fetchWithCache(
-                        `https://api.blockchain.info/charts/n-unique-addresses?timespan=${timeRange}&format=json&cors=true`,
-                        `users-${timeRange}`
-                    ),
-                    fetchWithCache(
-                        'https://api.blockchain.info/pools?timespan=5days',
-                        'miners'
-                    ),
-                    fetch('https://bitnodes.io/api/v1/snapshots/latest/')
+                    // retry wrappers
+                    (async () => {
+                        try { return await fetchJsonWithRetry(`https://api.blockchain.info/charts/n-unique-addresses?timespan=${timeRange}&format=json&cors=true`, 2, 700); }
+                        catch (e) { console.error('users fetch failed', e); return null; }
+                    })(),
+                    (async () => {
+                        try { return await fetchJsonWithRetry('https://api.blockchain.info/pools?timespan=5days', 2, 700); }
+                        catch (e) { console.error('miners fetch failed', e); return null; }
+                    })(),
+                    (async () => {
+                        try { return await fetchJsonWithRetry('https://bitnodes.io/api/v1/snapshots/latest/', 2, 700); }
+                        catch (e) { console.error('nodes fetch failed', e); return null; }
+                    })()
                 ]);
 
-                if (usersData) updateUsersVisualization(usersData);
-                if (minersData) updateMinersVisualization(minersData);
-                
-                if (nodesResponse.ok) {
-                    const nodesData = await nodesResponse.json();
-                    console.log('Raw nodes data:', nodesData); // Debug log
-                    updateNodesVisualization(nodesData);
-                }
+                if (usersData) updateUsersVisualization(usersData); else uE && uE.classList.add('show');
+                if (minersData) updateMinersVisualization(minersData); else mE && mE.classList.add('show');
+                if (nodesResponse) updateNodesVisualization(nodesResponse); else nE && nE.classList.add('show');
             } catch (error) {
                 console.error('Error in fetchNetworkData:', error);
+            } finally {
+                const uL = document.getElementById('users-loader');
+                const mL = document.getElementById('miners-loader');
+                const nL = document.getElementById('nodes-loader');
+                [uL,mL,nL].forEach(el => el && el.classList.remove('active'));
             }
         }
 
