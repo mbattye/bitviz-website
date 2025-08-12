@@ -167,6 +167,30 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* Chart error overlay */
+        .chart-error {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: var(--muted);
+            padding: 1rem;
+        }
+        .chart-error.show { display: flex; }
+
+        /* Focus styles for accessibility */
+        .time-button:focus-visible,
+        .panel-tab:focus-visible,
+        .currency:focus-visible,
+        .theme-toggle:focus-visible,
+        .close-panel-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: 6px;
+        }
+
         .price-container.panel-open {
             position: fixed;
             top: 20px;
@@ -391,6 +415,7 @@
                 </div>
             </div>
             <div id="chartLoader" class="chart-loader"><div class="spinner"></div></div>
+            <div id="chartError" class="chart-error">Unable to load chart data. Please try again.</div>
             <canvas id="priceChart"></canvas>
         </div>
     </div>
@@ -591,6 +616,37 @@
         // AbortController for chart requests
         let chartAbortController = null;
 
+        // Helper: fetch with retry and backoff
+        async function fetchJsonWithRetry(url, options = {}, retries = 2, backoffMs = 800) {
+            let lastErr;
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    const resp = await fetch(url, options);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    return await resp.json();
+                } catch (err) {
+                    lastErr = err;
+                    if (err.name === 'AbortError') throw err;
+                    if (attempt < retries) {
+                        await new Promise(r => setTimeout(r, backoffMs * Math.pow(2, attempt)));
+                        continue;
+                    }
+                }
+            }
+            throw lastErr;
+        }
+
+        // Helper: downsample large arrays (keep <= 1500 points)
+        function downsamplePairs(pairs, maxPoints = 1500) {
+            if (!pairs || pairs.length <= maxPoints) return pairs;
+            const step = Math.ceil(pairs.length / maxPoints);
+            const result = [];
+            for (let i = 0; i < pairs.length; i += step) result.push(pairs[i]);
+            // Ensure last point
+            if (result[result.length - 1] !== pairs[pairs.length - 1]) result.push(pairs[pairs.length - 1]);
+            return result;
+        }
+
         // Modified chart data fetching
         async function fetchChartData(range) {
             console.log(`fetchChartData called with range: ${range}`);
@@ -606,20 +662,20 @@
                 // show loader
                 const loader = document.getElementById('chartLoader');
                 if (loader) loader.classList.add('active');
+                const errorEl = document.getElementById('chartError');
+                if (errorEl) errorEl.classList.remove('show');
 
                 const url = `/api/bitcoin-historical/${range}`;
-                const response = await fetch(url, { signal });
-                console.log(`Response status: ${response.status}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
+                const data = await fetchJsonWithRetry(url, { signal }, 2, 600);
                 console.log('Received data:', data);
                 
                 if (!data?.prices?.length) {
                     throw new Error('Invalid data received');
+                }
+
+                // Optional downsample for ALL
+                if (range === 'ALL') {
+                    data.prices = downsamplePairs(data.prices, 1500);
                 }
 
                 if (!chart) {
@@ -635,6 +691,8 @@
                     return null;
                 }
                 console.error(`Error fetching ${range} data:`, error);
+                const errorEl = document.getElementById('chartError');
+                if (errorEl) errorEl.classList.add('show');
                 return null;
             } finally {
                 const loader = document.getElementById('chartLoader');
