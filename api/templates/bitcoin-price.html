@@ -139,6 +139,34 @@
             transition: all 0.3s ease;
         }
 
+        /* Error banner */
+        .error-banner {
+            display: none;
+            margin: 8px auto 0;
+            max-width: 600px;
+            padding: 8px 12px;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.08);
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .error-banner.show { display: block; }
+
+        /* Price loader */
+        .price-loader {
+            display: inline-block;
+            vertical-align: middle;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--muted);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            margin-left: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         .price-container.panel-open {
             position: fixed;
             top: 20px;
@@ -333,9 +361,11 @@
         <div class="price-display">
             <span id="price">...</span>
             <span class="currency" id="currency">GBP</span>
+            <span id="priceLoader" class="price-loader" style="display:none"></span>
         </div>
         <div class="change" id="change">... <span style="color: #94a3b8">24h</span></div>
     </div>
+    <div id="errorBanner" class="error-banner"></div>
 
     <div class="graph-panel">
         <div class="panel-tab">
@@ -440,10 +470,24 @@
             }
         }
 
+        // AbortController for price requests
+        let priceAbortController = null;
+
         // Modified price fetching function
         async function fetchBitcoinPrice() {
             try {
                 const cacheKey = `price-${currentCurrency.toLowerCase()}`;
+                // cancel in-flight
+                if (priceAbortController) priceAbortController.abort();
+                priceAbortController = new AbortController();
+                const { signal } = priceAbortController;
+
+                // UI: show loader, clear banner
+                const loader = document.getElementById('priceLoader');
+                const banner = document.getElementById('errorBanner');
+                if (banner) { banner.textContent = ''; banner.classList.remove('show'); }
+                if (loader) loader.style.display = '';
+
                 const data = await fetchWithCache(
                     `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currentCurrency.toLowerCase()}&include_24hr_change=true`,
                     cacheKey
@@ -477,6 +521,15 @@
                 }
             } catch (error) {
                 console.error('Error in fetchBitcoinPrice:', error);
+                const banner = document.getElementById('errorBanner');
+                if (banner && error.name !== 'AbortError') {
+                    banner.textContent = 'Unable to fetch latest price right now. Retrying shortly...';
+                    banner.classList.add('show');
+                }
+            }
+            finally {
+                const loader = document.getElementById('priceLoader');
+                if (loader) loader.style.display = 'none';
             }
         }
 
