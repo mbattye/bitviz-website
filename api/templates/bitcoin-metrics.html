@@ -661,8 +661,8 @@
                     .selectAll("path")
                     .data(topojson.feature(worldData, worldData.objects.countries).features)
                     .join("path")
-                    .attr("fill", getCssVar('--map-fill'))
-                    .attr("stroke", getCssVar('--map-stroke'))
+                    .attr("fill", cssVar('--map-fill', '#1e293b'))
+                    .attr("stroke", cssVar('--map-stroke', '#94a3b8'))
                     .attr("stroke-width", 0.5)
                     .attr("d", path);
 
@@ -697,10 +697,10 @@
                         const projectedCoords = projection([d.longitude, d.latitude]);
                         return projectedCoords ? projectedCoords[1] : null;
                     })
-                    .attr("r", 3)
-                    .attr("fill", getCssVar('--brand'))
+                    .attr("r", 3.2)
+                    .attr("fill", cssVar('--brand', '#f7931a'))
                     .attr("opacity", 0.6)
-                    .attr("stroke", getCssVar('--panel'))
+                    .attr("stroke", cssVar('--panel', '#0f172a'))
                     .attr("stroke-width", 0.5);
 
                 // Add hover effects
