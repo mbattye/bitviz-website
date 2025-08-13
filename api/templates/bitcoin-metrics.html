@@ -282,26 +282,6 @@
             </div>
         </div>
 
-        <!-- Macro & Context section -->
-        <div class="metrics-grid" style="margin-bottom: 2rem;">
-            <div class="metric-card" id="macro-section">
-                <div class="metric-header">
-                    <h2>Macro & Context</h2>
-                </div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                    <div class="metric-tile"><div class="tile-label">GBP per USD</div><div class="tile-value" id="mc-gbpPerUsd">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">USD per GBP</div><div class="tile-value" id="mc-usdPerGbp">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">GBP/USD 30d Change</div><div class="tile-value" id="mc-ch30">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y Change</div><div class="tile-value" id="mc-ch1y">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y High</div><div class="tile-value" id="mc-high">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y Low</div><div class="tile-value" id="mc-low">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">Position in 1y Range</div><div class="tile-value" id="mc-pos">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">UK CPI YoY</div><div class="tile-value" id="mc-cpiUK">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">US CPI YoY</div><div class="tile-value" id="mc-cpiUS">—</div></div>
-                </div>
-            </div>
-        </div>
-
         <!-- Price & Market section -->
         <div class="metrics-grid" style="margin-bottom: 2rem;">
             <div class="metric-card" id="market-section">
@@ -392,6 +372,26 @@
                 <div id="nodes-loader" class="metric-loader"><div class="spinner"></div></div>
                 <div id="nodes-error" class="metric-error">Unable to load nodes map. Please try again.</div>
                 <div id="nodes-viz" class="visualization nodes-viz"></div>
+            </div>
+        </div>
+
+        <!-- Macro & Context section (moved to end) -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+            <div class="metric-card" id="macro-section">
+                <div class="metric-header">
+                    <h2>Macro & Context</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">GBP per USD</div><div class="tile-value" id="mc-gbpPerUsd">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">USD per GBP</div><div class="tile-value" id="mc-usdPerGbp">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 30d Change</div><div class="tile-value" id="mc-ch30">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y Change</div><div class="tile-value" id="mc-ch1y">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y High</div><div class="tile-value" id="mc-high">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y Low</div><div class="tile-value" id="mc-low">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Position in 1y Range</div><div class="tile-value" id="mc-pos">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">UK CPI YoY</div><div class="tile-value" id="mc-cpiUK">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">US CPI YoY</div><div class="tile-value" id="mc-cpiUS">—</div></div>
+                </div>
             </div>
         </div>
     </div>
@@ -742,6 +742,10 @@
             .on('mouseout', () => tooltip.style('opacity', 0));
         }
 
+        // CSS var helpers for D3 theming
+        function getCssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+        function cssVar(name, fallback){ const v=getCssVar(name); return v && v.length ? v : fallback; }
+
         function updateNodesVisualization(data) {
             const container = document.getElementById('nodes-viz');
             container.innerHTML = '';
@@ -1000,7 +1004,7 @@
         }
 
         // Initial load
-        fetchFx().then(()=>{ console.log('[metrics] init loading...'); /*loadMacro();*/ loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); });
+        fetchFx().then(()=>{ console.log('[metrics] init loading...'); loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); setTimeout(loadMacro, 100); });
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
