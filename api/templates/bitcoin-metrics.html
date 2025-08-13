@@ -297,6 +297,26 @@
             </div>
         </div>
 
+        <!-- On-chain Supply section -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+            <div class="metric-card" id="supply-section">
+                <div class="metric-header">
+                    <h2>On-chain Supply</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: stretch;">
+                    <div class="metric-tile"><div class="tile-label">Height</div><div class="tile-value" id="oc-height">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Epoch</div><div class="tile-value" id="oc-epoch">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Blocks to Halving</div><div class="tile-value" id="oc-bth">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">ETA (UTC)</div><div class="tile-value" id="oc-eta">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Current Subsidy (BTC)</div><div class="tile-value" id="oc-subsidy">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Annual Issuance (BTC)</div><div class="tile-value" id="oc-issue">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Circulating Supply</div><div class="tile-value" id="oc-circ">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Max Supply</div><div class="tile-value" id="oc-max">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">% of Max Mined</div><div class="tile-value" id="oc-circpct">—</div></div>
+                </div>
+            </div>
+        </div>
+
         <div class="metrics-grid">
             <div class="metric-card users">
                 <div class="metric-header">
@@ -830,8 +850,29 @@
             }
         }
 
+        async function loadOnchainSupply(){
+            try{
+                const r = await fetch('/api/onchain-supply');
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                const s = await r.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                document.getElementById('oc-height').textContent = f(s.height);
+                document.getElementById('oc-epoch').textContent = f(s.epoch);
+                document.getElementById('oc-bth').textContent = f(s.blocks_to_halving);
+                document.getElementById('oc-eta').textContent = s.eta_utc ? new Date(s.eta_utc).toLocaleString('en-GB',{hour12:false}) : '—';
+                document.getElementById('oc-subsidy').textContent = f(s.current_subsidy_btc,{maximumFractionDigits:8});
+                document.getElementById('oc-issue').textContent = f(s.annual_issuance_btc,{maximumFractionDigits:0});
+                document.getElementById('oc-circ').textContent = f(s.circulating_supply,{maximumFractionDigits:0});
+                document.getElementById('oc-max').textContent = f(s.max_supply,{maximumFractionDigits:0});
+                document.getElementById('oc-circpct').textContent = f(s.circulating_pct_of_max,{maximumFractionDigits:2})+'%';
+            }catch(e){
+                console.error('onchain-supply fetch failed', e);
+            }
+        }
+
         // Initial load
         loadMarketStructure();
+        loadOnchainSupply();
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
