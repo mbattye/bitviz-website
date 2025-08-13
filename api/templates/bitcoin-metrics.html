@@ -341,8 +341,17 @@
             </div>
 
             <div class="metric-card users">
-                <div class="metric-header">
-                    <h2>Active Users</h2>
+                <div class="metric-header" style="margin-bottom: 0.75rem;">
+                    <h2>Adoption & Usage</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">LN Capacity (BTC)</div><div class="tile-value" id="au-ln">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Active Addresses (latest)</div><div class="tile-value" id="au-aa">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Transactions per Day</div><div class="tile-value" id="au-tx">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Avg Fee / Tx</div><div class="tile-value" id="au-fee">—</div></div>
+                </div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top: 14px;">
+                    <div style="color:var(--muted); font-size:.95rem;">Active Users</div>
                     <div class="time-range-buttons">
                         <button class="time-button" data-range="7days">7D</button>
                         <button class="time-button active" data-range="30days">30D</button>
@@ -353,13 +362,6 @@
                 <div id="users-loader" class="metric-loader"><div class="spinner"></div></div>
                 <div id="users-error" class="metric-error">Unable to load users data. Please try again.</div>
                 <div id="users-viz" class="visualization users-viz"></div>
-                <div style="margin-top:12px; color:var(--muted); font-size:.9rem;">Adoption & Usage</div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top:8px;">
-                    <div class="metric-tile"><div class="tile-label">LN Capacity (BTC)</div><div class="tile-value" id="au-ln">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">Active Addresses (latest)</div><div class="tile-value" id="au-aa">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">Transactions per Day</div><div class="tile-value" id="au-tx">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">Avg Fee / Tx</div><div class="tile-value" id="au-fee">—</div></div>
-                </div>
             </div>
             <div class="metric-card nodes">
                 <div class="metric-header">
