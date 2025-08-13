@@ -416,8 +416,11 @@ def macro_context():
         start_365 = end - timedelta(days=365)
         def pct_change(start_date):
             url = 'https://api.exchangerate.host/timeseries'
-            r = requests.get(url, params={'base':'USD','symbols':'GBP','start_date': start_date.isoformat(), 'end_date': end.isoformat()}, timeout=20)
-            if not r.ok:
+            try:
+                r = requests.get(url, params={'base':'USD','symbols':'GBP','start_date': start_date.isoformat(), 'end_date': end.isoformat()}, timeout=20)
+                if not r.ok:
+                    return None, None
+            except Exception:
                 return None, None
             j = r.json()
             rates = j.get('rates', {})
@@ -444,8 +447,11 @@ def macro_context():
         if cpi_cached is None:
             def wb_latest(country):
                 url = f'https://api.worldbank.org/v2/country/{country}/indicator/FP.CPI.TOTL.ZG'
-                r = requests.get(url, params={'format':'json','per_page':1,'date':'2018:2035'}, timeout=20)
-                if not r.ok:
+                try:
+                    r = requests.get(url, params={'format':'json','per_page':1,'date':'2018:2035'}, timeout=20)
+                    if not r.ok:
+                        return None, None
+                except Exception:
                     return None, None
                 j = r.json()
                 if isinstance(j, list) and len(j) == 2 and j[1]:
@@ -472,8 +478,15 @@ def macro_context():
             'gbp_per_usd_1y_high': round(one_y_high, 4) if one_y_high is not None else None,
             'gbp_per_usd_1y_low': round(one_y_low, 4) if one_y_low is not None else None,
             'gbp_per_usd_position_in_1y_range_pct': round(pct_in_range, 2) if pct_in_range is not None else None,
-            **cpi_data
         }
+        # Merge CPI fields only if available
+        if cpi_data:
+            data.update({
+                'uk_cpi_yoy_date': cpi_data.get('uk_cpi_yoy_date'),
+                'uk_cpi_yoy_pct': cpi_data.get('uk_cpi_yoy_pct'),
+                'us_cpi_yoy_date': cpi_data.get('us_cpi_yoy_date'),
+                'us_cpi_yoy_pct': cpi_data.get('us_cpi_yoy_pct'),
+            })
         _write_cache(cache_file, data)
         return jsonify(data)
     except Exception as e:
