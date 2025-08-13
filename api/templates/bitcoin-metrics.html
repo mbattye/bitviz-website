@@ -298,6 +298,8 @@
                     <div class="metric-tile"><div class="tile-label">200D SMA</div><div class="tile-value" id="ms-sma200">—</div></div>
                     <div class="metric-tile"><div class="tile-label">Mayer Multiple</div><div class="tile-value" id="ms-mayer">—</div></div>
                     <div class="metric-tile"><div class="tile-label">Distance to 200D</div><div class="tile-value" id="ms-smaDist">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Days Since Cycle Top</div><div class="tile-value" id="ms-topDays">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Days Since Cycle Bottom</div><div class="tile-value" id="ms-bottomDays">—</div></div>
                 </div>
             </div>
         </div>
@@ -878,6 +880,8 @@
                 document.getElementById('ms-sma200').textContent = smaDisp.sym + f(smaDisp.val,{maximumFractionDigits:0});
                 document.getElementById('ms-mayer').textContent = f(ms.mayer_multiple,{maximumFractionDigits:3});
                 document.getElementById('ms-smaDist').textContent = f(ms.sma200_distance_pct,{maximumFractionDigits:2})+'%';
+                document.getElementById('ms-topDays').textContent = f(ms.days_since_cycle_top);
+                document.getElementById('ms-bottomDays').textContent = f(ms.days_since_cycle_bottom);
             }catch(e){
                 console.error('market-structure fetch failed', e);
             }

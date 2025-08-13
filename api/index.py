@@ -166,6 +166,20 @@ def market_structure():
         mayer = spot / sma200
         sma_dist_pct = ((spot - sma200)/sma200) * 100.0
 
+        # Cycle windows (approximate last 4 years)
+        window_days = 365 * 4
+        start_idx = max(0, len(closes) - window_days)
+        closes_4y = closes[start_idx:]
+        dates_4y = dates[start_idx:]
+        if closes_4y:
+            max_idx = max(range(len(closes_4y)), key=lambda i: closes_4y[i])
+            min_idx = min(range(len(closes_4y)), key=lambda i: closes_4y[i])
+            days_since_cycle_top = (dates[-1] - dates_4y[max_idx]).days
+            days_since_cycle_bottom = (dates[-1] - dates_4y[min_idx]).days
+        else:
+            days_since_cycle_top = None
+            days_since_cycle_bottom = None
+
         metrics = {
             'spot_gbp': round(spot, 2),
             'ath_gbp': round(ath, 2),
@@ -176,6 +190,8 @@ def market_structure():
             'sma200_gbp': round(sma200, 2),
             'mayer_multiple': round(mayer, 3),
             'sma200_distance_pct': round(sma_dist_pct, 2),
+            'days_since_cycle_top': days_since_cycle_top,
+            'days_since_cycle_bottom': days_since_cycle_bottom,
             'as_of_date': dates[-1].strftime('%Y-%m-%d'),
         }
 
