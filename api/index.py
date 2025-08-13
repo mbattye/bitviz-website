@@ -352,6 +352,26 @@ def miner_economics():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/fx-rate')
+def fx_rate():
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / 'fx_usdgbp_cache.json'
+        cached = _cached_json(cache_file, timedelta(hours=6))
+        if cached and 'gbp_per_usd' in cached:
+            return jsonify(cached)
+        r = requests.get('https://api.exchangerate.host/latest', params={'base':'USD','symbols':'GBP'}, timeout=15)
+        r.raise_for_status()
+        j = r.json()
+        rate = float(j['rates']['GBP'])
+        data = {'gbp_per_usd': rate}
+        _write_cache(cache_file, data)
+        return jsonify(data)
+    except Exception:
+        # Fallback conservative
+        return jsonify({'gbp_per_usd': 0.78}), 200
+
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):
     print(f"Received request for range: {range}")

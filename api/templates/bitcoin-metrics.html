@@ -266,6 +266,10 @@
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:1rem;">
             <h1 class="title" style="margin:0">Bitcoin Network Metrics</h1>
             <!-- Theme toggle (inline in header) -->
+            <div style="display:flex; align-items:center; gap:8px;">
+            <button id="fxToggle" class="theme-toggle" aria-label="Toggle currency" title="Toggle currency" style="position:static; width:42px;">
+                <span id="fxLabel" style="font-size:.85rem;">GBP</span>
+            </button>
             <button id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme" style="position:static;">
                 <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
@@ -275,6 +279,7 @@
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                 </svg>
             </button>
+            </div>
         </div>
 
         <!-- Price & Market section -->
@@ -325,10 +330,14 @@
                 </div>
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                     <div class="metric-tile"><div class="tile-label">Hashrate (7d avg)</div><div class="tile-value" id="me-hr">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">Miner Revenue (USD)</div><div class="tile-value" id="me-rev">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">Fees (USD)</div><div class="tile-value" id="me-fees">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Miner Revenue</div><div class="tile-value" id="me-rev">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Fees</div><div class="tile-value" id="me-fees">—</div></div>
                     <div class="metric-tile"><div class="tile-label">Fees % of Revenue</div><div class="tile-value" id="me-feesPct">—</div></div>
                 </div>
+                <div style="margin-top:12px; color:var(--muted); font-size:.9rem;">Mining Distribution</div>
+                <div id="miners-loader" class="metric-loader"><div class="spinner"></div></div>
+                <div id="miners-error" class="metric-error">Unable to load mining data. Please try again.</div>
+                <div id="miners-viz" class="visualization miners-viz" style="margin-top:8px;"></div>
             </div>
 
             <div class="metric-card users">
@@ -344,12 +353,6 @@
                 <div id="users-loader" class="metric-loader"><div class="spinner"></div></div>
                 <div id="users-error" class="metric-error">Unable to load users data. Please try again.</div>
                 <div id="users-viz" class="visualization users-viz"></div>
-            </div>
-            <div class="metric-card miners">
-                <div class="metric-header">
-                    <h2>Mining Distribution</h2>
-                </div>
-                <div id="miners-viz" class="visualization miners-viz"></div>
             </div>
             <div class="metric-card nodes">
                 <div class="metric-header">
@@ -816,13 +819,13 @@
                 const buttons = Array.from(document.querySelectorAll('.time-button'));
                 buttons.forEach(b => b.disabled = true);
                 try {
-                    // Update active button
+                // Update active button
                     buttons.forEach(btn => btn.classList.remove('active'));
                     e.currentTarget.classList.add('active');
 
-                    // Update data
+                // Update data
                     currentTimeRange = e.currentTarget.dataset.range;
-                    await fetchNetworkData(currentTimeRange);
+                await fetchNetworkData(currentTimeRange);
                 } finally {
                     const buttons = Array.from(document.querySelectorAll('.time-button'));
                     buttons.forEach(b => b.disabled = false);
@@ -881,6 +884,11 @@
             }
         }
 
+        let fx = { mode: 'GBP', gbp_per_usd: 0.78 };
+        async function fetchFx(){
+            try{ const r=await fetch('/api/fx-rate'); if(r.ok){ const j=await r.json(); fx.gbp_per_usd=j.gbp_per_usd||fx.gbp_per_usd; } }catch(_){/*noop*/}
+        }
+
         async function loadMinerEconomics(){
             try{
                 const r = await fetch('/api/miner-economics');
@@ -888,8 +896,17 @@
                 const m = await r.json();
                 const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
                 document.getElementById('me-hr').textContent = f(m.hashrate_7d_avg,{maximumFractionDigits:2});
-                document.getElementById('me-rev').textContent = '$'+f(m.miners_revenue_usd,{maximumFractionDigits:0});
-                document.getElementById('me-fees').textContent = '$'+f(m.fees_usd,{maximumFractionDigits:0});
+                const revUSD = m.miners_revenue_usd;
+                const feesUSD = m.fees_usd;
+                if(fx.mode==='GBP'){
+                    const revGBP = revUSD==null? null : revUSD*fx.gbp_per_usd;
+                    const feesGBP = feesUSD==null? null : feesUSD*fx.gbp_per_usd;
+                    document.getElementById('me-rev').textContent = '£'+f(revGBP,{maximumFractionDigits:0});
+                    document.getElementById('me-fees').textContent = '£'+f(feesGBP,{maximumFractionDigits:0});
+                } else {
+                    document.getElementById('me-rev').textContent = '$'+f(revUSD,{maximumFractionDigits:0});
+                    document.getElementById('me-fees').textContent = '$'+f(feesUSD,{maximumFractionDigits:0});
+                }
                 document.getElementById('me-feesPct').textContent = f(m.fees_pct_of_revenue,{maximumFractionDigits:2})+'%';
             }catch(e){
                 console.error('miner-economics fetch failed', e);
@@ -899,10 +916,21 @@
         // Initial load
         loadMarketStructure();
         loadOnchainSupply();
-        loadMinerEconomics();
+        fetchFx().then(loadMinerEconomics);
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
+
+        // Currency toggle wiring
+        document.getElementById('fxToggle').addEventListener('click', async ()=>{
+            fx.mode = fx.mode==='GBP' ? 'USD' : 'GBP';
+            document.getElementById('fxLabel').textContent = fx.mode;
+            await fetchFx();
+            // Re-render currency-sensitive tiles
+            await loadMinerEconomics();
+            // Price & Market: just re-fetch market structure (it returns GBP values); for now display GBP only
+            // Optionally, later extend backend to return USD too.
+        });
     </script>
 </body>
 </html> 
