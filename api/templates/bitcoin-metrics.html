@@ -418,7 +418,7 @@
                         'miners-5days'
                     ).catch(e => { console.error('miners fetch failed', e); return null; }),
                     fetchWithCacheRetry(
-                        'https://bitnodes.io/api/v1/snapshots/latest/',
+                        '/api/nodes-latest',
                         'nodes-latest'
                     ).catch(e => { console.error('nodes fetch failed', e); return null; })
                 ]);
