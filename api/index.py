@@ -275,6 +275,83 @@ def onchain_supply():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def _bc_chart(chart: str, timespan: str, cache_dir: Path, max_age_min=10) -> Optional[dict]:
+    cache_file = cache_dir / f'bc_{chart}_{timespan}.json'
+    cached = _cached_json(cache_file, timedelta(minutes=max_age_min))
+    if cached:
+        return cached
+    url = f'https://api.blockchain.info/charts/{chart}'
+    r = requests.get(url, params={'timespan': timespan, 'format': 'json', 'cors': 'true'}, timeout=20)
+    r.raise_for_status()
+    data = r.json()
+    _write_cache(cache_file, data)
+    return data
+
+def _moving_average(series, window: int):
+    if not series or window <= 1:
+        return series
+    out = []
+    acc = 0.0
+    q = []
+    for v in series:
+        q.append(v)
+        acc += v
+        if len(q) > window:
+            acc -= q.pop(0)
+        out.append(acc / len(q))
+    return out
+
+@app.route('/api/miner-economics')
+def miner_economics():
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Pull charts (10 min cache)
+        hr = _bc_chart('hash-rate', '1year', cache_dir, 10)
+        rev = _bc_chart('miners-revenue', '1year', cache_dir, 10)
+        fees = _bc_chart('transaction-fees-usd', '1year', cache_dir, 10)
+
+        # Extract y series aligned by date
+        def to_map(obj):
+            vals = obj.get('values', []) if obj else []
+            return {int(pt.get('x')): float(pt.get('y')) for pt in vals if 'x' in pt and 'y' in pt}
+
+        hr_map = to_map(hr)
+        rev_map = to_map(rev)
+        fees_map = to_map(fees)
+
+        # Build sorted date list present in hashrate
+        dates = sorted(hr_map.keys())
+        hr_series = [hr_map[d] for d in dates]
+        hr_ma7 = _moving_average(hr_series, 7)
+
+        latest_date = dates[-1] if dates else None
+        latest_hr_ma7 = hr_ma7[-1] if hr_ma7 else None
+        latest_rev = None
+        latest_fees = None
+        if latest_date:
+            # Select closest date available in revenue/fees not exceeding latest_date
+            def latest_not_after(m):
+                ks = [k for k in m.keys() if k <= latest_date]
+                return m[max(ks)] if ks else None
+            latest_rev = latest_not_after(rev_map)
+            latest_fees = latest_not_after(fees_map)
+
+        fees_pct = None
+        if latest_rev and latest_rev != 0 and latest_fees is not None:
+            fees_pct = (latest_fees / latest_rev) * 100.0
+
+        payload = {
+            'hashrate_7d_avg': round(latest_hr_ma7, 2) if latest_hr_ma7 is not None else None,
+            'miners_revenue_usd': round(latest_rev, 0) if latest_rev is not None else None,
+            'fees_usd': round(latest_fees, 0) if latest_fees is not None else None,
+            'fees_pct_of_revenue': round(fees_pct, 2) if fees_pct is not None else None,
+        }
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):
     print(f"Received request for range: {range}")

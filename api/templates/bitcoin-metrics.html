@@ -318,6 +318,19 @@
         </div>
 
         <div class="metrics-grid">
+            <!-- Miner & Economics section -->
+            <div class="metric-card" id="miners-econ">
+                <div class="metric-header">
+                    <h2>Miner & Economics</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">Hashrate (7d avg)</div><div class="tile-value" id="me-hr">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Miner Revenue (USD)</div><div class="tile-value" id="me-rev">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Fees (USD)</div><div class="tile-value" id="me-fees">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Fees % of Revenue</div><div class="tile-value" id="me-feesPct">—</div></div>
+                </div>
+            </div>
+
             <div class="metric-card users">
                 <div class="metric-header">
                     <h2>Active Users</h2>
@@ -336,8 +349,6 @@
                 <div class="metric-header">
                     <h2>Mining Distribution</h2>
                 </div>
-                <div id="miners-loader" class="metric-loader"><div class="spinner"></div></div>
-                <div id="miners-error" class="metric-error">Unable to load mining data. Please try again.</div>
                 <div id="miners-viz" class="visualization miners-viz"></div>
             </div>
             <div class="metric-card nodes">
@@ -870,9 +881,25 @@
             }
         }
 
+        async function loadMinerEconomics(){
+            try{
+                const r = await fetch('/api/miner-economics');
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                const m = await r.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                document.getElementById('me-hr').textContent = f(m.hashrate_7d_avg,{maximumFractionDigits:2});
+                document.getElementById('me-rev').textContent = '$'+f(m.miners_revenue_usd,{maximumFractionDigits:0});
+                document.getElementById('me-fees').textContent = '$'+f(m.fees_usd,{maximumFractionDigits:0});
+                document.getElementById('me-feesPct').textContent = f(m.fees_pct_of_revenue,{maximumFractionDigits:2})+'%';
+            }catch(e){
+                console.error('miner-economics fetch failed', e);
+            }
+        }
+
         // Initial load
         loadMarketStructure();
         loadOnchainSupply();
+        loadMinerEconomics();
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
