@@ -407,32 +407,46 @@ def macro_context():
         if cached:
             return jsonify(cached)
 
-        # Spot FX using helper (no self-call)
-        gbp_per_usd = _get_gbp_per_usd(cache_dir) or 0.78
-
-        # 30d and 1y changes using timeseries
+        # Prefer frankfurter.app timeseries (robust free source)
         end = datetime.utcnow().date()
         start_30 = end - timedelta(days=30)
         start_365 = end - timedelta(days=365)
-        def pct_change(start_date):
-            url = 'https://api.exchangerate.host/timeseries'
+        def ff_series(start_date):
+            url = f'https://api.frankfurter.app/{start_date.isoformat()}..{end.isoformat()}'
             try:
-                r = requests.get(url, params={'base':'USD','symbols':'GBP','start_date': start_date.isoformat(), 'end_date': end.isoformat()}, timeout=20)
+                r = requests.get(url, params={'from': 'USD', 'to': 'GBP'}, timeout=20)
                 if not r.ok:
-                    return None, None
+                    return None
+                j = r.json()
+                rates = j.get('rates', {})
+                if not rates:
+                    return None
+                # sorted by date
+                dates_sorted = sorted(rates.keys())
+                return [float(rates[d]['GBP']) for d in dates_sorted]
             except Exception:
-                return None, None
-            j = r.json()
-            rates = j.get('rates', {})
-            if not rates:
-                return None, None
-            first_date = sorted(rates.keys())[0]
-            last_date = sorted(rates.keys())[-1]
-            first = float(rates[first_date]['GBP'])
-            last = float(rates[last_date]['GBP'])
-            return ((last/first) - 1.0) * 100.0, [float(rates[d]['GBP']) for d in sorted(rates.keys())]
-        change_30d, series_30 = pct_change(start_30)
-        change_1y, series_1y = pct_change(start_365)
+                return None
+
+        series_30 = ff_series(start_30)
+        series_1y = ff_series(start_365)
+
+        def pct_change_from_series(series):
+            if not series or len(series) < 2:
+                return None
+            first, last = series[0], series[-1]
+            try:
+                return ((last/first) - 1.0) * 100.0
+            except Exception:
+                return None
+
+        change_30d = pct_change_from_series(series_30)
+        change_1y = pct_change_from_series(series_1y)
+
+        # Spot from frankfurter last rate if available, else helper
+        if series_1y and len(series_1y) > 0:
+            gbp_per_usd = series_1y[-1]
+        else:
+            gbp_per_usd = _get_gbp_per_usd(cache_dir) or 0.78
 
         # 1y high/low and percentile position
         one_y_high = max(series_1y) if series_1y else None
