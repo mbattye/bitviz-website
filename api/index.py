@@ -388,6 +388,55 @@ def fx_rate():
         # Fallback conservative
         return jsonify({'gbp_per_usd': 0.78}), 200
 
+@app.route('/api/macro-context')
+def macro_context():
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / 'macro_context_cache.json'
+        cached = _cached_json(cache_file, timedelta(hours=6))
+        if cached:
+            return jsonify(cached)
+
+        # Spot from our fx endpoint
+        fx_resp = requests.get('http://localhost:5000/api/fx-rate', timeout=10)
+        if not fx_resp.ok:
+            gbp_per_usd = 0.78
+        else:
+            gbp_per_usd = float(fx_resp.json().get('gbp_per_usd', 0.78))
+
+        # 30d and 1y changes using timeseries
+        end = datetime.utcnow().date()
+        start_30 = end - timedelta(days=30)
+        start_365 = end - timedelta(days=365)
+        def pct_change(start_date):
+            url = 'https://api.exchangerate.host/timeseries'
+            r = requests.get(url, params={'base':'USD','symbols':'GBP','start_date': start_date.isoformat(), 'end_date': end.isoformat()}, timeout=20)
+            if not r.ok:
+                return None
+            j = r.json()
+            rates = j.get('rates', {})
+            if not rates:
+                return None
+            first_date = sorted(rates.keys())[0]
+            last_date = sorted(rates.keys())[-1]
+            first = float(rates[first_date]['GBP'])
+            last = float(rates[last_date]['GBP'])
+            return ((last/first) - 1.0) * 100.0
+        change_30d = pct_change(start_30)
+        change_1y = pct_change(start_365)
+
+        data = {
+            'gbp_per_usd': round(gbp_per_usd, 6),
+            'usd_per_gbp': round(1.0/gbp_per_usd, 6) if gbp_per_usd else None,
+            'gbp_per_usd_change_30d_pct': round(change_30d, 2) if change_30d is not None else None,
+            'gbp_per_usd_change_1y_pct': round(change_1y, 2) if change_1y is not None else None,
+        }
+        _write_cache(cache_file, data)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/adoption-usage')
 def adoption_usage():
     try:

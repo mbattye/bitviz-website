@@ -282,6 +282,21 @@
             </div>
         </div>
 
+        <!-- Macro & Context section -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+            <div class="metric-card" id="macro-section">
+                <div class="metric-header">
+                    <h2>Macro & Context</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">GBP per USD</div><div class="tile-value" id="mc-gbpPerUsd">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">USD per GBP</div><div class="tile-value" id="mc-usdPerGbp">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 30d Change</div><div class="tile-value" id="mc-ch30">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y Change</div><div class="tile-value" id="mc-ch1y">—</div></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Price & Market section -->
         <div class="metrics-grid" style="margin-bottom: 2rem;">
             <div class="metric-card" id="market-section">
@@ -861,50 +876,17 @@
             const s=document.createElement('style');s.textContent=css;document.head.appendChild(s);
         })();
 
-        async function loadMarketStructure(){
+        async function loadMacro(){
             try{
-                const res = await fetch('/api/market-structure');
-                if(!res.ok) throw new Error(`HTTP ${res.status}`);
-                const ms = await res.json();
-                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
-                const toUSD = (gbp)=> gbp==null? null : (gbp / fx.gbp_per_usd);
-                const spotDisp = fx.mode==='GBP' ? {sym:'£', val: ms.spot_gbp} : {sym:'$', val: toUSD(ms.spot_gbp)};
-                const athDisp  = fx.mode==='GBP' ? {sym:'£', val: ms.ath_gbp}  : {sym:'$', val: toUSD(ms.ath_gbp)};
-                const smaDisp  = fx.mode==='GBP' ? {sym:'£', val: ms.sma200_gbp}: {sym:'$', val: toUSD(ms.sma200_gbp)};
-                document.getElementById('ms-spot').textContent = spotDisp.sym + f(spotDisp.val,{maximumFractionDigits:0});
-                document.getElementById('ms-ath').textContent  = athDisp.sym  + f(athDisp.val,{maximumFractionDigits:0});
-                document.getElementById('ms-dd').textContent = f(ms.drawdown_from_ath_pct,{maximumFractionDigits:2})+'%';
-                document.getElementById('ms-vol30').textContent = f(ms.volatility_30d_annualized_pct,{maximumFractionDigits:1})+'%';
-                document.getElementById('ms-vol90').textContent = f(ms.volatility_90d_annualized_pct,{maximumFractionDigits:1})+'%';
-                document.getElementById('ms-pctabove').textContent = f(ms.pct_days_above_current_pct,{maximumFractionDigits:1})+'%';
-                document.getElementById('ms-sma200').textContent = smaDisp.sym + f(smaDisp.val,{maximumFractionDigits:0});
-                document.getElementById('ms-mayer').textContent = f(ms.mayer_multiple,{maximumFractionDigits:3});
-                document.getElementById('ms-smaDist').textContent = f(ms.sma200_distance_pct,{maximumFractionDigits:2})+'%';
-                document.getElementById('ms-topDays').textContent = f(ms.days_since_cycle_top);
-                document.getElementById('ms-bottomDays').textContent = f(ms.days_since_cycle_bottom);
-            }catch(e){
-                console.error('market-structure fetch failed', e);
-            }
-        }
-
-        async function loadOnchainSupply(){
-            try{
-                const r = await fetch('/api/onchain-supply');
+                const r = await fetch('/api/macro-context');
                 if(!r.ok) throw new Error(`HTTP ${r.status}`);
-                const s = await r.json();
+                const m = await r.json();
                 const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
-                document.getElementById('oc-height').textContent = f(s.height);
-                document.getElementById('oc-epoch').textContent = f(s.epoch);
-                document.getElementById('oc-bth').textContent = f(s.blocks_to_halving);
-                document.getElementById('oc-eta').textContent = s.eta_utc ? new Date(s.eta_utc).toLocaleDateString('en-GB') : '—';
-                document.getElementById('oc-subsidy').textContent = f(s.current_subsidy_btc,{maximumFractionDigits:8});
-                document.getElementById('oc-issue').textContent = f(s.annual_issuance_btc,{maximumFractionDigits:0});
-                document.getElementById('oc-circ').textContent = f(s.circulating_supply,{maximumFractionDigits:0});
-                document.getElementById('oc-max').textContent = f(s.max_supply,{maximumFractionDigits:0});
-                document.getElementById('oc-circpct').textContent = f(s.circulating_pct_of_max,{maximumFractionDigits:2})+'%';
-            }catch(e){
-                console.error('onchain-supply fetch failed', e);
-            }
+                document.getElementById('mc-gbpPerUsd').textContent = f(m.gbp_per_usd,{maximumFractionDigits:4});
+                document.getElementById('mc-usdPerGbp').textContent = f(m.usd_per_gbp,{maximumFractionDigits:4});
+                document.getElementById('mc-ch30').textContent = f(m.gbp_per_usd_change_30d_pct,{maximumFractionDigits:2})+'%';
+                document.getElementById('mc-ch1y').textContent = f(m.gbp_per_usd_change_1y_pct,{maximumFractionDigits:2})+'%';
+            }catch(e){ console.error('macro-context fetch failed', e); }
         }
 
         async function loadMinerEconomics(){
@@ -952,7 +934,7 @@
         }
 
         // Initial load
-        fetchFx().then(()=>{ loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); });
+        fetchFx().then(()=>{ loadMacro(); loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); });
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
@@ -966,6 +948,7 @@
             await loadMarketStructure();
             await loadMinerEconomics();
             await loadAdoptionUsage();
+            await loadMacro();
             // Price & Market: just re-fetch market structure (it returns GBP values); for now display GBP only
             // Optionally, later extend backend to return USD too.
         });
