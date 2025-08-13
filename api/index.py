@@ -401,12 +401,21 @@ def adoption_usage():
         # Lightning capacity
         ln_capacity_btc = None
         try:
-            r = requests.get('https://mempool.space/api/v1/lightning/network', timeout=15)
+            # Primary: v1 lightning stats
+            r = requests.get('https://mempool.space/api/v1/lightning/stats', timeout=15)
             if r.ok:
                 j = r.json()
                 cap_sats = j.get('capacity')
                 if isinstance(cap_sats, (int, float)):
                     ln_capacity_btc = round(float(cap_sats) / 100_000_000.0, 2)
+            if ln_capacity_btc is None:
+                # Fallback: v2
+                r2 = requests.get('https://mempool.space/api/v2/lightning/statistics', timeout=15)
+                if r2.ok:
+                    j2 = r2.json()
+                    cap_sats2 = j2.get('total_capacity')
+                    if isinstance(cap_sats2, (int, float)):
+                        ln_capacity_btc = round(float(cap_sats2) / 100_000_000.0, 2)
         except Exception:
             pass
 
