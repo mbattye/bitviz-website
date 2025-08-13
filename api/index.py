@@ -413,24 +413,61 @@ def macro_context():
             url = 'https://api.exchangerate.host/timeseries'
             r = requests.get(url, params={'base':'USD','symbols':'GBP','start_date': start_date.isoformat(), 'end_date': end.isoformat()}, timeout=20)
             if not r.ok:
-                return None
+                return None, None
             j = r.json()
             rates = j.get('rates', {})
             if not rates:
-                return None
+                return None, None
             first_date = sorted(rates.keys())[0]
             last_date = sorted(rates.keys())[-1]
             first = float(rates[first_date]['GBP'])
             last = float(rates[last_date]['GBP'])
-            return ((last/first) - 1.0) * 100.0
-        change_30d = pct_change(start_30)
-        change_1y = pct_change(start_365)
+            return ((last/first) - 1.0) * 100.0, [float(rates[d]['GBP']) for d in sorted(rates.keys())]
+        change_30d, series_30 = pct_change(start_30)
+        change_1y, series_1y = pct_change(start_365)
+
+        # 1y high/low and percentile position
+        one_y_high = max(series_1y) if series_1y else None
+        one_y_low = min(series_1y) if series_1y else None
+        pct_in_range = None
+        if series_1y and one_y_high is not None and one_y_low is not None and one_y_high != one_y_low:
+            pct_in_range = ((gbp_per_usd - one_y_low) / (one_y_high - one_y_low)) * 100.0
+
+        # Latest CPI YoY from World Bank (annual %). Cache separately for 24h within macro cache
+        wb_cache = cache_dir / 'macro_cpi_cache.json'
+        cpi_cached = _cached_json(wb_cache, timedelta(hours=24))
+        if cpi_cached is None:
+            def wb_latest(country):
+                url = f'https://api.worldbank.org/v2/country/{country}/indicator/FP.CPI.TOTL.ZG'
+                r = requests.get(url, params={'format':'json','per_page':1,'date':'2018:2035'}, timeout=20)
+                if not r.ok:
+                    return None, None
+                j = r.json()
+                if isinstance(j, list) and len(j) == 2 and j[1]:
+                    entry = j[1][0]
+                    return entry.get('date'), entry.get('value')
+                return None, None
+            uk_date, uk_cpi = wb_latest('GBR')
+            us_date, us_cpi = wb_latest('USA')
+            cpi_data = {
+                'uk_cpi_yoy_date': uk_date,
+                'uk_cpi_yoy_pct': uk_cpi,
+                'us_cpi_yoy_date': us_date,
+                'us_cpi_yoy_pct': us_cpi,
+            }
+            _write_cache(wb_cache, cpi_data)
+        else:
+            cpi_data = cpi_cached
 
         data = {
             'gbp_per_usd': round(gbp_per_usd, 6),
             'usd_per_gbp': round(1.0/gbp_per_usd, 6) if gbp_per_usd else None,
             'gbp_per_usd_change_30d_pct': round(change_30d, 2) if change_30d is not None else None,
             'gbp_per_usd_change_1y_pct': round(change_1y, 2) if change_1y is not None else None,
+            'gbp_per_usd_1y_high': round(one_y_high, 4) if one_y_high is not None else None,
+            'gbp_per_usd_1y_low': round(one_y_low, 4) if one_y_low is not None else None,
+            'gbp_per_usd_position_in_1y_range_pct': round(pct_in_range, 2) if pct_in_range is not None else None,
+            **cpi_data
         }
         _write_cache(cache_file, data)
         return jsonify(data)

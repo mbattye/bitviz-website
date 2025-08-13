@@ -293,6 +293,11 @@
                     <div class="metric-tile"><div class="tile-label">USD per GBP</div><div class="tile-value" id="mc-usdPerGbp">—</div></div>
                     <div class="metric-tile"><div class="tile-label">GBP/USD 30d Change</div><div class="tile-value" id="mc-ch30">—</div></div>
                     <div class="metric-tile"><div class="tile-label">GBP/USD 1y Change</div><div class="tile-value" id="mc-ch1y">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y High</div><div class="tile-value" id="mc-high">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y Low</div><div class="tile-value" id="mc-low">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Position in 1y Range</div><div class="tile-value" id="mc-pos">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">UK CPI YoY</div><div class="tile-value" id="mc-cpiUK">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">US CPI YoY</div><div class="tile-value" id="mc-cpiUS">—</div></div>
                 </div>
             </div>
         </div>
@@ -886,6 +891,13 @@
                 document.getElementById('mc-usdPerGbp').textContent = f(m.usd_per_gbp,{maximumFractionDigits:4});
                 document.getElementById('mc-ch30').textContent = f(m.gbp_per_usd_change_30d_pct,{maximumFractionDigits:2})+'%';
                 document.getElementById('mc-ch1y').textContent = f(m.gbp_per_usd_change_1y_pct,{maximumFractionDigits:2})+'%';
+                document.getElementById('mc-high').textContent = f(m.gbp_per_usd_1y_high,{maximumFractionDigits:4});
+                document.getElementById('mc-low').textContent = f(m.gbp_per_usd_1y_low,{maximumFractionDigits:4});
+                document.getElementById('mc-pos').textContent = f(m.gbp_per_usd_position_in_1y_range_pct,{maximumFractionDigits:1})+'%';
+                const uk = (m.uk_cpi_yoy_pct==null? '—' : m.uk_cpi_yoy_pct.toFixed(1)+'%') + (m.uk_cpi_yoy_date? ` (${m.uk_cpi_yoy_date})`:'');
+                const us = (m.us_cpi_yoy_pct==null? '—' : m.us_cpi_yoy_pct.toFixed(1)+'%') + (m.us_cpi_yoy_date? ` (${m.us_cpi_yoy_date})`:'');
+                document.getElementById('mc-cpiUK').textContent = uk;
+                document.getElementById('mc-cpiUS').textContent = us;
             }catch(e){ console.error('macro-context fetch failed', e); }
         }
 
