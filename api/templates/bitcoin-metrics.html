@@ -13,6 +13,10 @@
             --muted: #94a3b8;
             --panel: #1e293b;
             --brand: #f7931a;
+            --tooltip-bg: #334155;
+            --tooltip-text: #e2e8f0;
+            --map-fill: #1e293b;
+            --map-stroke: #94a3b8;
         }
 
         :root[data-theme="light"] {
@@ -21,6 +25,10 @@
             --muted: #475569;
             --panel: #ffffff;
             --brand: #f7931a;
+            --tooltip-bg: #ffffff;
+            --tooltip-text: #0f172a;
+            --map-fill: #e2e8f0;   /* slate-200 for land */
+            --map-stroke: #94a3b8; /* slate-400 for borders */
         }
 
         body {
@@ -61,6 +69,24 @@
             position: relative;
         }
 
+        /* Loaders and errors */
+        .metric-loader,
+        .metric-error {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1rem;
+        }
+        .metric-loader { pointer-events: none; }
+        .metric-loader.active,
+        .metric-error.show { display: flex; }
+        .spinner { width: 26px; height: 26px; border: 3px solid var(--muted); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .metric-error { color: var(--muted); }
+
         .metric-card:hover {
             transform: translateY(-5px);
         }
@@ -86,6 +112,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             font-size: 0.8rem;
+            min-width: 44px;
         }
 
         .time-button:hover {
@@ -99,13 +126,15 @@
             color: #0f172a;
         }
 
+        /* Focus styles */
+        .time-button:focus-visible,
+        .theme-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+
         .visualization {
             width: 100%;
         }
 
-        .visualization.users-viz {
-            height: 170px;
-        }
+        .visualization.users-viz { height: 300px; }
 
         .visualization.miners-viz {
             height: 400px;
@@ -125,9 +154,11 @@
         .tooltip {
             position: absolute;
             padding: 8px;
-            background: #334155;
+            background: var(--tooltip-bg);
             border-radius: 4px;
-            color: var(--muted);
+            color: var(--tooltip-text);
+            border: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
             font-size: 0.875rem;
             pointer-events: none;
             opacity: 0;
@@ -155,13 +186,13 @@
         .treemap-label {
             font-size: 12px;
             fill: #fff;
+            paint-order: stroke fill;
+            stroke-width: 2px;
+            stroke: rgba(0,0,0,0.35);
             pointer-events: none;
         }
 
-        .metric-card.users {
-            height: 250px;
-            margin-bottom: 2rem;
-        }
+        .metric-card.users { height: 360px; margin-bottom: 2rem; }
 
         .metric-card.miners {
             height: 500px;
@@ -246,18 +277,24 @@
                         <button class="time-button" data-range="all">All</button>
                     </div>
                 </div>
+                <div id="users-loader" class="metric-loader"><div class="spinner"></div></div>
+                <div id="users-error" class="metric-error">Unable to load users data. Please try again.</div>
                 <div id="users-viz" class="visualization users-viz"></div>
             </div>
             <div class="metric-card miners">
                 <div class="metric-header">
                     <h2>Mining Distribution</h2>
                 </div>
+                <div id="miners-loader" class="metric-loader"><div class="spinner"></div></div>
+                <div id="miners-error" class="metric-error">Unable to load mining data. Please try again.</div>
                 <div id="miners-viz" class="visualization miners-viz"></div>
             </div>
             <div class="metric-card nodes">
                 <div class="metric-header">
                     <h2>Network Nodes</h2>
                 </div>
+                <div id="nodes-loader" class="metric-loader"><div class="spinner"></div></div>
+                <div id="nodes-error" class="metric-error">Unable to load nodes map. Please try again.</div>
                 <div id="nodes-viz" class="visualization nodes-viz"></div>
             </div>
         </div>
@@ -329,30 +366,74 @@
             }
         }
 
+        // Helper: retry with backoff
+        async function fetchJsonWithRetry(url, retries = 2, backoffMs = 800) {
+            let lastErr;
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    return await resp.json();
+                } catch (err) {
+                    lastErr = err;
+                    if (attempt < retries) {
+                        await new Promise(r => setTimeout(r, backoffMs * Math.pow(2, attempt)));
+                        continue;
+                    }
+                }
+            }
+            throw lastErr;
+        }
+
+        // Helper: cache + retry wrapper
+        async function fetchWithCacheRetry(url, cacheKey, retries = 2, backoffMs = 800) {
+            const now = Date.now();
+            if (cache[cacheKey] && (now - cache[cacheKey].timestamp) < CACHE_DURATION) {
+                return cache[cacheKey].data;
+            }
+            const data = await fetchJsonWithRetry(url, retries, backoffMs);
+            cache[cacheKey] = { data, timestamp: now };
+            return data;
+        }
+
         async function fetchNetworkData(timeRange = currentTimeRange) {
             try {
-                const [usersData, minersData, nodesResponse] = await Promise.all([
-                    fetchWithCache(
+                // show loaders and clear errors
+                const uL = document.getElementById('users-loader');
+                const mL = document.getElementById('miners-loader');
+                const nL = document.getElementById('nodes-loader');
+                const uE = document.getElementById('users-error');
+                const mE = document.getElementById('miners-error');
+                const nE = document.getElementById('nodes-error');
+                [uE,mE,nE].forEach(el => el && el.classList.remove('show'));
+                [uL,mL,nL].forEach(el => el && el.classList.add('active'));
+
+                const [usersData, minersData, nodesData] = await Promise.all([
+                    fetchWithCacheRetry(
                         `https://api.blockchain.info/charts/n-unique-addresses?timespan=${timeRange}&format=json&cors=true`,
                         `users-${timeRange}`
-                    ),
-                    fetchWithCache(
+                    ).catch(e => { console.error('users fetch failed', e); return null; }),
+                    fetchWithCacheRetry(
                         'https://api.blockchain.info/pools?timespan=5days',
-                        'miners'
-                    ),
-                    fetch('https://bitnodes.io/api/v1/snapshots/latest/')
+                        'miners-5days'
+                    ).catch(e => { console.error('miners fetch failed', e); return null; }),
+                    fetchWithCacheRetry(
+                        '/api/nodes-latest',
+                        'nodes-latest'
+                    ).catch(e => { console.error('nodes fetch failed', e); return null; })
                 ]);
 
-                if (usersData) updateUsersVisualization(usersData);
-                if (minersData) updateMinersVisualization(minersData);
-                
-                if (nodesResponse.ok) {
-                    const nodesData = await nodesResponse.json();
-                    console.log('Raw nodes data:', nodesData); // Debug log
-                    updateNodesVisualization(nodesData);
-                }
+                if (usersData) updateUsersVisualization(usersData); else uE && uE.classList.add('show');
+                if (minersData) updateMinersVisualization(minersData); else mE && mE.classList.add('show');
+                // Always render map; if nodes unavailable, show map without nodes (no error overlay)
+                updateNodesVisualization(nodesData || { nodes: {} });
             } catch (error) {
                 console.error('Error in fetchNetworkData:', error);
+            } finally {
+                const uL = document.getElementById('users-loader');
+                const mL = document.getElementById('miners-loader');
+                const nL = document.getElementById('nodes-loader');
+                [uL,mL,nL].forEach(el => el && el.classList.remove('active'));
             }
         }
 
@@ -523,43 +604,22 @@
                 .attr('fill', d => {
                     const cellWidth = d.x1 - d.x0;
                     const cellHeight = d.y1 - d.y0;
-                    
-                    // Debug logs
-                    console.log('Cell dimensions:', {
-                        width: cellWidth,
-                        height: cellHeight,
-                        data: d.data[0],
-                        index: root.leaves().indexOf(d)
-                    });
-                    
                     if (cellWidth < 60 || cellHeight < 30) return 'transparent';
-                    
-                    // Get the index of this box in size order
-                    const index = root.leaves().indexOf(d);
-                    const color = (index % 10 < 2) ? '#1e293b' : '#ffffff';
-                    
-                    // Debug log
-                    console.log('Text color:', {
-                        name: d.data[0],
-                        index: index,
-                        color: color
-                    });
-                    
-                    return color;
+                    const fill = d3.color(colorScale(d.data.name));
+                    if (!fill) return '#0f172a';
+                    const brightness = (fill.r * 299 + fill.g * 587 + fill.b * 114) / 1000;
+                    return brightness > 150 ? '#0f172a' : '#ffffff';
+                })
+                .attr('stroke', d => {
+                    const fill = d3.color(colorScale(d.data.name));
+                    if (!fill) return 'rgba(0,0,0,0.35)';
+                    const brightness = (fill.r * 299 + fill.g * 587 + fill.b * 114) / 1000;
+                    return brightness > 150 ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)';
                 })
                 .text(d => {
                     const cellWidth = d.x1 - d.x0;
                     const cellHeight = d.y1 - d.y0;
                     const text = cellWidth < 60 || cellHeight < 30 ? '' : d.data.name;
-                    
-                    // Debug log
-                    console.log('Text content:', {
-                        name: d.data[0],
-                        width: cellWidth,
-                        height: cellHeight,
-                        text: text
-                    });
-                    
                     return text;
                 });
 
@@ -612,14 +672,15 @@
                     .selectAll("path")
                     .data(topojson.feature(worldData, worldData.objects.countries).features)
                     .join("path")
-                    .attr("fill", "#1e293b")
-                    .attr("stroke", "#94a3b8")
+                    .attr("fill", cssVar('--map-fill', '#1e293b'))
+                    .attr("stroke", cssVar('--map-stroke', '#94a3b8'))
                     .attr("stroke-width", 0.5)
                     .attr("d", path);
 
                 // Process nodes data - using address field to get coordinates
                 const nodesArray = [];
-                for (const [nodeId, nodeInfo] of Object.entries(data.nodes)) {
+                const entries = data && data.nodes ? Object.entries(data.nodes) : [];
+                for (const [nodeId, nodeInfo] of entries) {
                     // The address field contains the IP:PORT
                     const address = nodeInfo[1];  // Get the address string
                     if (nodeInfo[8] && nodeInfo[9]) {  // Check if lat/lon exists
@@ -648,10 +709,10 @@
                         const projectedCoords = projection([d.longitude, d.latitude]);
                         return projectedCoords ? projectedCoords[1] : null;
                     })
-                    .attr("r", 3)
-                    .attr("fill", "#f7931a")
+                    .attr("r", 3.2)
+                    .attr("fill", cssVar('--brand', '#f7931a'))
                     .attr("opacity", 0.6)
-                    .attr("stroke", "#ffffff")
+                    .attr("stroke", cssVar('--panel', '#0f172a'))
                     .attr("stroke-width", 0.5);
 
                 // Add hover effects
@@ -685,16 +746,26 @@
         }
 
         // Add event listeners to time range buttons
+        let metricsClickLock = false;
         document.querySelectorAll('.time-button').forEach(button => {
             button.addEventListener('click', async (e) => {
-                // Update active button
-                document.querySelectorAll('.time-button').forEach(btn => 
-                    btn.classList.remove('active'));
-                e.target.classList.add('active');
+                if (metricsClickLock) return;
+                metricsClickLock = true;
+                const buttons = Array.from(document.querySelectorAll('.time-button'));
+                buttons.forEach(b => b.disabled = true);
+                try {
+                    // Update active button
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
 
-                // Update data
-                currentTimeRange = e.target.dataset.range;
-                await fetchNetworkData(currentTimeRange);
+                    // Update data
+                    currentTimeRange = e.currentTarget.dataset.range;
+                    await fetchNetworkData(currentTimeRange);
+                } finally {
+                    const buttons = Array.from(document.querySelectorAll('.time-button'));
+                    buttons.forEach(b => b.disabled = false);
+                    setTimeout(() => { metricsClickLock = false; }, 200);
+                }
             });
         });
 

@@ -3,6 +3,8 @@ import csv
 from datetime import datetime, timedelta
 from pathlib import Path
 import time
+import json
+import requests
 
 app = Flask(__name__)
 
@@ -17,6 +19,49 @@ def bitcoin_price():
 @app.route('/bitcoin-metrics')
 def bitcoin_metrics():
     return render_template('bitcoin-metrics.html')
+
+@app.route('/api/nodes-latest')
+def nodes_latest():
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / 'nodes_latest_cache.json'
+        now = datetime.utcnow()
+
+        # Serve cache if fresh (<24h)
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r') as f:
+                    cached = json.load(f)
+                fetched_at = datetime.fromisoformat(cached.get('fetched_at'))
+                if (now - fetched_at) < timedelta(hours=24) and 'data' in cached:
+                    return jsonify(cached['data'])
+            except Exception:
+                pass
+
+        # Fetch from Bitnodes
+        resp = requests.get('https://bitnodes.io/api/v1/snapshots/latest/', timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Write cache
+        with open(cache_file, 'w') as f:
+            json.dump({'fetched_at': now.isoformat(), 'data': data}, f)
+
+        return jsonify(data)
+    except Exception as e:
+        # On failure, try stale cache
+        cache_file = Path(__file__).parent / 'data' / 'nodes_latest_cache.json'
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r') as f:
+                    cached = json.load(f)
+                if 'data' in cached:
+                    return jsonify(cached['data'])
+            except Exception:
+                pass
+        # Fallback: return empty structure so UI can render without error
+        return jsonify({'nodes': {}}), 200
 
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):

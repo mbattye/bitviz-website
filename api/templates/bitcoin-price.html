@@ -139,6 +139,58 @@
             transition: all 0.3s ease;
         }
 
+        /* Error banner */
+        .error-banner {
+            display: none;
+            margin: 8px auto 0;
+            max-width: 600px;
+            padding: 8px 12px;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.08);
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .error-banner.show { display: block; }
+
+        /* Price loader */
+        .price-loader {
+            display: inline-block;
+            vertical-align: middle;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--muted);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+            margin-left: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Chart error overlay */
+        .chart-error {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: var(--muted);
+            padding: 1rem;
+        }
+        .chart-error.show { display: flex; }
+
+        /* Focus styles for accessibility */
+        .time-button:focus-visible,
+        .panel-tab:focus-visible,
+        .currency:focus-visible,
+        .theme-toggle:focus-visible,
+        .close-panel-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: 6px;
+        }
+
         .price-container.panel-open {
             position: fixed;
             top: 20px;
@@ -265,6 +317,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             margin-right: 0.5rem;
+            min-width: 56px;
         }
 
         .time-button:hover {
@@ -333,9 +386,11 @@
         <div class="price-display">
             <span id="price">...</span>
             <span class="currency" id="currency">GBP</span>
+            <span id="priceLoader" class="price-loader" style="display:none"></span>
         </div>
         <div class="change" id="change">... <span style="color: #94a3b8">24h</span></div>
     </div>
+    <div id="errorBanner" class="error-banner"></div>
 
     <div class="graph-panel">
         <div class="panel-tab">
@@ -361,6 +416,7 @@
                 </div>
             </div>
             <div id="chartLoader" class="chart-loader"><div class="spinner"></div></div>
+            <div id="chartError" class="chart-error">Unable to load chart data. Please try again.</div>
             <canvas id="priceChart"></canvas>
         </div>
     </div>
@@ -440,10 +496,24 @@
             }
         }
 
+        // AbortController for price requests
+        let priceAbortController = null;
+
         // Modified price fetching function
         async function fetchBitcoinPrice() {
             try {
                 const cacheKey = `price-${currentCurrency.toLowerCase()}`;
+                // cancel in-flight
+                if (priceAbortController) priceAbortController.abort();
+                priceAbortController = new AbortController();
+                const { signal } = priceAbortController;
+
+                // UI: show loader, clear banner
+                const loader = document.getElementById('priceLoader');
+                const banner = document.getElementById('errorBanner');
+                if (banner) { banner.textContent = ''; banner.classList.remove('show'); }
+                if (loader) loader.style.display = '';
+
                 const data = await fetchWithCache(
                     `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currentCurrency.toLowerCase()}&include_24hr_change=true`,
                     cacheKey
@@ -477,6 +547,15 @@
                 }
             } catch (error) {
                 console.error('Error in fetchBitcoinPrice:', error);
+                const banner = document.getElementById('errorBanner');
+                if (banner && error.name !== 'AbortError') {
+                    banner.textContent = 'Unable to fetch latest price right now. Retrying shortly...';
+                    banner.classList.add('show');
+                }
+            }
+            finally {
+                const loader = document.getElementById('priceLoader');
+                if (loader) loader.style.display = 'none';
             }
         }
 
@@ -502,18 +581,22 @@
         });
 
         // Add fresh event listeners with better logging
+        let chartClickLock = false;
         document.querySelectorAll('.time-button').forEach(button => {
             button.addEventListener('click', async (e) => {
+                if (chartClickLock) return;
+                chartClickLock = true;
+                const buttons = Array.from(document.querySelectorAll('.time-button'));
+                buttons.forEach(b => b.disabled = true);
                 try {
-                    const range = e.target.dataset.range;
+                    const range = e.currentTarget.dataset.range;
                     console.log(`Time button clicked: ${range}`);
 
                     // Update active button state
-                    document.querySelectorAll('.time-button').forEach(btn => 
-                        btn.classList.remove('active'));
-                    e.target.classList.add('active');
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
 
-                    // Clear existing chart data
+                    // Clear existing chart data for smoother transition
                     if (chart) {
                         chart.data.labels = [];
                         chart.data.datasets[0].data = [];
@@ -522,21 +605,54 @@
 
                     console.log(`Fetching data for range: ${range}`);
                     const data = await fetchChartData(range);
-                    
                     if (!data) {
                         console.error(`No data returned for range: ${range}`);
                         return;
                     }
-
                     console.log(`Successfully updated chart with ${data.prices?.length} data points`);
                 } catch (error) {
                     console.error('Error in time button click handler:', error);
+                } finally {
+                    const buttons = Array.from(document.querySelectorAll('.time-button'));
+                    buttons.forEach(b => b.disabled = false);
+                    setTimeout(() => { chartClickLock = false; }, 200);
                 }
             });
         });
 
         // AbortController for chart requests
         let chartAbortController = null;
+
+        // Helper: fetch with retry and backoff
+        async function fetchJsonWithRetry(url, options = {}, retries = 2, backoffMs = 800) {
+            let lastErr;
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    const resp = await fetch(url, options);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    return await resp.json();
+                } catch (err) {
+                    lastErr = err;
+                    if (err.name === 'AbortError') throw err;
+                    if (attempt < retries) {
+                        await new Promise(r => setTimeout(r, backoffMs * Math.pow(2, attempt)));
+                        continue;
+                    }
+                }
+            }
+            throw lastErr;
+        }
+
+        // Helper: downsample large arrays (keep <= 1500 points)
+        function downsamplePairs(pairs, maxPoints = 1500) {
+            if (!pairs || pairs.length <= maxPoints) return pairs;
+            const step = Math.ceil(pairs.length / maxPoints);
+            const result = [];
+            for (let i = 0; i < pairs.length; i += step) result.push(pairs[i]);
+            // Ensure last point
+            if (result[result.length - 1] !== pairs[pairs.length - 1]) result.push(pairs[pairs.length - 1]);
+            return result;
+        }
 
         // Modified chart data fetching
         async function fetchChartData(range) {
@@ -553,20 +669,20 @@
                 // show loader
                 const loader = document.getElementById('chartLoader');
                 if (loader) loader.classList.add('active');
+                const errorEl = document.getElementById('chartError');
+                if (errorEl) errorEl.classList.remove('show');
 
                 const url = `/api/bitcoin-historical/${range}`;
-                const response = await fetch(url, { signal });
-                console.log(`Response status: ${response.status}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
+                const data = await fetchJsonWithRetry(url, { signal }, 2, 600);
                 console.log('Received data:', data);
                 
                 if (!data?.prices?.length) {
                     throw new Error('Invalid data received');
+                }
+
+                // Optional downsample for ALL
+                if (range === 'ALL') {
+                    data.prices = downsamplePairs(data.prices, 1500);
                 }
 
                 if (!chart) {
@@ -582,6 +698,8 @@
                     return null;
                 }
                 console.error(`Error fetching ${range} data:`, error);
+                const errorEl = document.getElementById('chartError');
+                if (errorEl) errorEl.classList.add('show');
                 return null;
             } finally {
                 const loader = document.getElementById('chartLoader');
