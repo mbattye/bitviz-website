@@ -244,6 +244,16 @@
         }
         .theme-toggle:hover { border-color: var(--brand); color: var(--brand); }
         .theme-toggle svg { width: 18px; height: 18px; }
+
+        /* Basic tiles styling injection (keeps CSS block small) */
+        (function injectTileStyles(){
+            const css = `
+            .metric-tile{background:var(--panel);border:1px solid rgba(148,163,184,0.25);border-radius:10px;padding:12px}
+            .tile-label{font-size:.8rem;color:var(--muted);margin-bottom:4px}
+            .tile-value{font-size:1.25rem;color:var(--text);font-weight:600}
+            `;
+            const s=document.createElement('style');s.textContent=css;document.head.appendChild(s);
+        })();
     </style>
 </head>
 <body>
@@ -266,6 +276,27 @@
                 </svg>
             </button>
         </div>
+
+        <!-- Price & Market section -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+            <div class="metric-card" id="market-section">
+                <div class="metric-header">
+                    <h2>Price & Market</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">Spot (GBP)</div><div class="tile-value" id="ms-spot">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">ATH (GBP)</div><div class="tile-value" id="ms-ath">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Drawdown from ATH</div><div class="tile-value" id="ms-dd">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">30d Vol (ann.)</div><div class="tile-value" id="ms-vol30">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">90d Vol (ann.)</div><div class="tile-value" id="ms-vol90">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">% Days Above Price</div><div class="tile-value" id="ms-pctabove">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">200D SMA</div><div class="tile-value" id="ms-sma200">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Mayer Multiple</div><div class="tile-value" id="ms-mayer">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Distance to 200D</div><div class="tile-value" id="ms-smaDist">—</div></div>
+                </div>
+            </div>
+        </div>
+
         <div class="metrics-grid">
             <div class="metric-card users">
                 <div class="metric-header">
@@ -769,7 +800,38 @@
             });
         });
 
+        // Basic tiles styling injection (keeps CSS block small)
+        (function injectTileStyles(){
+            const css = `
+            .metric-tile{background:var(--panel);border:1px solid rgba(148,163,184,0.25);border-radius:10px;padding:12px}
+            .tile-label{font-size:.8rem;color:var(--muted);margin-bottom:4px}
+            .tile-value{font-size:1.25rem;color:var(--text);font-weight:600}
+            `;
+            const s=document.createElement('style');s.textContent=css;document.head.appendChild(s);
+        })();
+
+        async function loadMarketStructure(){
+            try{
+                const res = await fetch('/api/market-structure');
+                if(!res.ok) throw new Error(`HTTP ${res.status}`);
+                const ms = await res.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                document.getElementById('ms-spot').textContent = '£'+f(ms.spot_gbp,{maximumFractionDigits:0});
+                document.getElementById('ms-ath').textContent = '£'+f(ms.ath_gbp,{maximumFractionDigits:0});
+                document.getElementById('ms-dd').textContent = f(ms.drawdown_from_ath_pct,{maximumFractionDigits:2})+'%';
+                document.getElementById('ms-vol30').textContent = f(ms.volatility_30d_annualized_pct,{maximumFractionDigits:1})+'%';
+                document.getElementById('ms-vol90').textContent = f(ms.volatility_90d_annualized_pct,{maximumFractionDigits:1})+'%';
+                document.getElementById('ms-pctabove').textContent = f(ms.pct_days_above_current_pct,{maximumFractionDigits:1})+'%';
+                document.getElementById('ms-sma200').textContent = '£'+f(ms.sma200_gbp,{maximumFractionDigits:0});
+                document.getElementById('ms-mayer').textContent = f(ms.mayer_multiple,{maximumFractionDigits:3});
+                document.getElementById('ms-smaDist').textContent = f(ms.sma200_distance_pct,{maximumFractionDigits:2})+'%';
+            }catch(e){
+                console.error('market-structure fetch failed', e);
+            }
+        }
+
         // Initial load
+        loadMarketStructure();
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
