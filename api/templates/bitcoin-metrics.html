@@ -353,6 +353,13 @@
                 <div id="users-loader" class="metric-loader"><div class="spinner"></div></div>
                 <div id="users-error" class="metric-error">Unable to load users data. Please try again.</div>
                 <div id="users-viz" class="visualization users-viz"></div>
+                <div style="margin-top:12px; color:var(--muted); font-size:.9rem;">Adoption & Usage</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top:8px;">
+                    <div class="metric-tile"><div class="tile-label">LN Capacity (BTC)</div><div class="tile-value" id="au-ln">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Active Addresses (latest)</div><div class="tile-value" id="au-aa">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Transactions per Day</div><div class="tile-value" id="au-tx">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Avg Fee / Tx</div><div class="tile-value" id="au-fee">—</div></div>
+                </div>
             </div>
             <div class="metric-card nodes">
                 <div class="metric-header">
@@ -913,10 +920,30 @@
             }
         }
 
+        async function loadAdoptionUsage(){
+            try{
+                const r = await fetch('/api/adoption-usage');
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                const a = await r.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                document.getElementById('au-ln').textContent = f(a.ln_capacity_btc,{maximumFractionDigits:2});
+                document.getElementById('au-aa').textContent = f(a.active_addresses,{maximumFractionDigits:0});
+                document.getElementById('au-tx').textContent = f(a.transactions_per_day,{maximumFractionDigits:0});
+                // fee in USD -> convert to GBP if needed
+                const feeUSD = a.avg_fee_per_tx_usd;
+                if(fx.mode==='GBP'){
+                    const feeGBP = feeUSD==null? null : feeUSD*fx.gbp_per_usd;
+                    document.getElementById('au-fee').textContent = feeGBP==null? '—' : '£'+feeGBP.toFixed(2);
+                } else {
+                    document.getElementById('au-fee').textContent = feeUSD==null? '—' : '$'+feeUSD.toFixed(2);
+                }
+            }catch(e){ console.error('adoption-usage fetch failed', e); }
+        }
+
         // Initial load
         loadMarketStructure();
         loadOnchainSupply();
-        fetchFx().then(loadMinerEconomics);
+        fetchFx().then(()=>{ loadMinerEconomics(); loadAdoptionUsage(); });
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
@@ -928,6 +955,7 @@
             await fetchFx();
             // Re-render currency-sensitive tiles
             await loadMinerEconomics();
+            await loadAdoptionUsage();
             // Price & Market: just re-fetch market structure (it returns GBP values); for now display GBP only
             // Optionally, later extend backend to return USD too.
         });

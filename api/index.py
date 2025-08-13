@@ -372,6 +372,55 @@ def fx_rate():
         # Fallback conservative
         return jsonify({'gbp_per_usd': 0.78}), 200
 
+@app.route('/api/adoption-usage')
+def adoption_usage():
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / 'adoption_usage_cache.json'
+        cached = _cached_json(cache_file, timedelta(minutes=10))
+        if cached:
+            return jsonify(cached)
+
+        # Active addresses and tx/day (30d window for recency)
+        aa = _bc_chart('n-unique-addresses', '30days', cache_dir, 10)
+        txd = _bc_chart('n-transactions', '30days', cache_dir, 10)
+        fees_usd = _bc_chart('transaction-fees-usd', '30days', cache_dir, 10)
+
+        def latest_value(chart_obj):
+            vals = chart_obj.get('values', []) if chart_obj else []
+            return float(vals[-1]['y']) if vals else None
+
+        active_addresses = latest_value(aa)
+        tx_per_day = latest_value(txd)
+        fees_usd_latest = latest_value(fees_usd)
+        avg_fee_per_tx_usd = None
+        if tx_per_day and tx_per_day != 0 and fees_usd_latest is not None:
+            avg_fee_per_tx_usd = fees_usd_latest / tx_per_day
+
+        # Lightning capacity
+        ln_capacity_btc = None
+        try:
+            r = requests.get('https://mempool.space/api/v1/lightning/network', timeout=15)
+            if r.ok:
+                j = r.json()
+                cap_sats = j.get('capacity')
+                if isinstance(cap_sats, (int, float)):
+                    ln_capacity_btc = round(float(cap_sats) / 100_000_000.0, 2)
+        except Exception:
+            pass
+
+        data = {
+            'active_addresses': round(active_addresses, 0) if active_addresses is not None else None,
+            'transactions_per_day': round(tx_per_day, 0) if tx_per_day is not None else None,
+            'avg_fee_per_tx_usd': round(avg_fee_per_tx_usd, 2) if avg_fee_per_tx_usd is not None else None,
+            'ln_capacity_btc': ln_capacity_btc,
+        }
+        _write_cache(cache_file, data)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):
     print(f"Received request for range: {range}")
