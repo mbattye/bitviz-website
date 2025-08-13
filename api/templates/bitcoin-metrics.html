@@ -307,7 +307,7 @@
                     <div class="metric-tile"><div class="tile-label">Height</div><div class="tile-value" id="oc-height">—</div></div>
                     <div class="metric-tile"><div class="tile-label">Epoch</div><div class="tile-value" id="oc-epoch">—</div></div>
                     <div class="metric-tile"><div class="tile-label">Blocks to Halving</div><div class="tile-value" id="oc-bth">—</div></div>
-                    <div class="metric-tile"><div class="tile-label">ETA (UTC)</div><div class="tile-value" id="oc-eta">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Halving ETA</div><div class="tile-value" id="oc-eta">—</div></div>
                     <div class="metric-tile"><div class="tile-label">Current Subsidy (BTC)</div><div class="tile-value" id="oc-subsidy">—</div></div>
                     <div class="metric-tile"><div class="tile-label">Annual Issuance (BTC)</div><div class="tile-value" id="oc-issue">—</div></div>
                     <div class="metric-tile"><div class="tile-label">Circulating Supply</div><div class="tile-value" id="oc-circ">—</div></div>
@@ -859,7 +859,7 @@
                 document.getElementById('oc-height').textContent = f(s.height);
                 document.getElementById('oc-epoch').textContent = f(s.epoch);
                 document.getElementById('oc-bth').textContent = f(s.blocks_to_halving);
-                document.getElementById('oc-eta').textContent = s.eta_utc ? new Date(s.eta_utc).toLocaleString('en-GB',{hour12:false}) : '—';
+                document.getElementById('oc-eta').textContent = s.eta_utc ? new Date(s.eta_utc).toLocaleDateString('en-GB') : '—';
                 document.getElementById('oc-subsidy').textContent = f(s.current_subsidy_btc,{maximumFractionDigits:8});
                 document.getElementById('oc-issue').textContent = f(s.annual_issuance_btc,{maximumFractionDigits:0});
                 document.getElementById('oc-circ').textContent = f(s.circulating_supply,{maximumFractionDigits:0});
