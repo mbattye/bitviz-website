@@ -218,6 +218,24 @@ def _write_cache(path: Path, data: dict):
     except Exception:
         pass
 
+def _get_gbp_per_usd(cache_dir: Path) -> Optional[float]:
+    cache_file = cache_dir / 'fx_usdgbp_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=6))
+    if cached and 'gbp_per_usd' in cached:
+        try:
+            return float(cached['gbp_per_usd'])
+        except Exception:
+            pass
+    try:
+        r = requests.get('https://api.exchangerate.host/latest', params={'base':'USD','symbols':'GBP'}, timeout=15)
+        r.raise_for_status()
+        j = r.json()
+        rate = float(j['rates']['GBP'])
+        _write_cache(cache_file, {'gbp_per_usd': rate})
+        return rate
+    except Exception:
+        return None
+
 @app.route('/api/onchain-supply')
 def onchain_supply():
     try:
@@ -373,17 +391,8 @@ def fx_rate():
     try:
         cache_dir = Path(__file__).parent / 'data'
         cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = cache_dir / 'fx_usdgbp_cache.json'
-        cached = _cached_json(cache_file, timedelta(hours=6))
-        if cached and 'gbp_per_usd' in cached:
-            return jsonify(cached)
-        r = requests.get('https://api.exchangerate.host/latest', params={'base':'USD','symbols':'GBP'}, timeout=15)
-        r.raise_for_status()
-        j = r.json()
-        rate = float(j['rates']['GBP'])
-        data = {'gbp_per_usd': rate}
-        _write_cache(cache_file, data)
-        return jsonify(data)
+        rate = _get_gbp_per_usd(cache_dir)
+        return jsonify({'gbp_per_usd': rate})
     except Exception:
         # Fallback conservative
         return jsonify({'gbp_per_usd': 0.78}), 200
@@ -398,12 +407,8 @@ def macro_context():
         if cached:
             return jsonify(cached)
 
-        # Spot from our fx endpoint
-        fx_resp = requests.get('http://localhost:5000/api/fx-rate', timeout=10)
-        if not fx_resp.ok:
-            gbp_per_usd = 0.78
-        else:
-            gbp_per_usd = float(fx_resp.json().get('gbp_per_usd', 0.78))
+        # Spot FX using helper (no self-call)
+        gbp_per_usd = _get_gbp_per_usd(cache_dir) or 0.78
 
         # 30d and 1y changes using timeseries
         end = datetime.utcnow().date()
