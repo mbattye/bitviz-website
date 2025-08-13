@@ -134,7 +134,7 @@
             width: 100%;
         }
 
-        .visualization.users-viz { height: 300px; }
+        .visualization.users-viz { height: 360px; }
 
         .visualization.miners-viz {
             height: 400px;
@@ -192,7 +192,7 @@
             pointer-events: none;
         }
 
-        .metric-card.users { height: 360px; margin-bottom: 2rem; }
+        .metric-card.users { height: 560px; margin-bottom: 2rem; }
 
         .metric-card.miners {
             height: 500px;
@@ -244,6 +244,16 @@
         }
         .theme-toggle:hover { border-color: var(--brand); color: var(--brand); }
         .theme-toggle svg { width: 18px; height: 18px; }
+
+        /* Basic tiles styling injection (keeps CSS block small) */
+        (function injectTileStyles(){
+            const css = `
+            .metric-tile{background:var(--panel);border:1px solid rgba(148,163,184,0.25);border-radius:10px;padding:12px}
+            .tile-label{font-size:.8rem;color:var(--muted);margin-bottom:4px}
+            .tile-value{font-size:1.25rem;color:var(--text);font-weight:600}
+            `;
+            const s=document.createElement('style');s.textContent=css;document.head.appendChild(s);
+        })();
     </style>
 </head>
 <body>
@@ -256,6 +266,10 @@
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:1rem;">
             <h1 class="title" style="margin:0">Bitcoin Network Metrics</h1>
             <!-- Theme toggle (inline in header) -->
+            <div style="display:flex; align-items:center; gap:8px;">
+            <button id="fxToggle" class="theme-toggle" aria-label="Toggle currency" title="Toggle currency" style="position:static; width:42px;">
+                <span id="fxLabel" style="font-size:.85rem;">GBP</span>
+            </button>
             <button id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme" style="position:static;">
                 <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
@@ -265,11 +279,81 @@
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                 </svg>
             </button>
+            </div>
         </div>
-        <div class="metrics-grid">
-            <div class="metric-card users">
+
+        <!-- Price & Market section -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+            <div class="metric-card" id="market-section">
                 <div class="metric-header">
-                    <h2>Active Users</h2>
+                    <h2>Price & Market</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">Spot (GBP)</div><div class="tile-value" id="ms-spot">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">ATH (GBP)</div><div class="tile-value" id="ms-ath">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Drawdown from ATH</div><div class="tile-value" id="ms-dd">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">30d Vol (ann.)</div><div class="tile-value" id="ms-vol30">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">90d Vol (ann.)</div><div class="tile-value" id="ms-vol90">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">% Days Above Price</div><div class="tile-value" id="ms-pctabove">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">200D SMA</div><div class="tile-value" id="ms-sma200">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Mayer Multiple</div><div class="tile-value" id="ms-mayer">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Distance to 200D</div><div class="tile-value" id="ms-smaDist">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Days Since Cycle Top</div><div class="tile-value" id="ms-topDays">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Days Since Cycle Bottom</div><div class="tile-value" id="ms-bottomDays">—</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- On-chain Supply section -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+            <div class="metric-card" id="supply-section">
+                <div class="metric-header">
+                    <h2>On-chain Supply</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: stretch;">
+                    <div class="metric-tile"><div class="tile-label">Height</div><div class="tile-value" id="oc-height">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Epoch</div><div class="tile-value" id="oc-epoch">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Blocks to Halving</div><div class="tile-value" id="oc-bth">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Halving ETA</div><div class="tile-value" id="oc-eta">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Current Subsidy (BTC)</div><div class="tile-value" id="oc-subsidy">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Annual Issuance (BTC)</div><div class="tile-value" id="oc-issue">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Circulating Supply</div><div class="tile-value" id="oc-circ">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Max Supply</div><div class="tile-value" id="oc-max">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">% of Max Mined</div><div class="tile-value" id="oc-circpct">—</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <!-- Miner & Economics section -->
+            <div class="metric-card" id="miners-econ">
+                <div class="metric-header">
+                    <h2>Miner & Economics</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">Hashrate (7d avg)</div><div class="tile-value" id="me-hr">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Miner Revenue</div><div class="tile-value" id="me-rev">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Fees</div><div class="tile-value" id="me-fees">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Fees % of Revenue</div><div class="tile-value" id="me-feesPct">—</div></div>
+                </div>
+                <div style="margin-top:12px; color:var(--muted); font-size:.9rem;">Mining Distribution</div>
+                <div id="miners-loader" class="metric-loader"><div class="spinner"></div></div>
+                <div id="miners-error" class="metric-error">Unable to load mining data. Please try again.</div>
+                <div id="miners-viz" class="visualization miners-viz" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="metric-card users">
+                <div class="metric-header" style="margin-bottom: 0.75rem;">
+                    <h2>Adoption & Usage</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">LN Capacity (BTC)</div><div class="tile-value" id="au-ln">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Active Addresses (latest)</div><div class="tile-value" id="au-aa">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Transactions per Day</div><div class="tile-value" id="au-tx">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Avg Fee / Tx</div><div class="tile-value" id="au-fee">—</div></div>
+                </div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top: 14px;">
+                    <div style="color:var(--muted); font-size:.95rem;">Active Users</div>
                     <div class="time-range-buttons">
                         <button class="time-button" data-range="7days">7D</button>
                         <button class="time-button active" data-range="30days">30D</button>
@@ -281,14 +365,6 @@
                 <div id="users-error" class="metric-error">Unable to load users data. Please try again.</div>
                 <div id="users-viz" class="visualization users-viz"></div>
             </div>
-            <div class="metric-card miners">
-                <div class="metric-header">
-                    <h2>Mining Distribution</h2>
-                </div>
-                <div id="miners-loader" class="metric-loader"><div class="spinner"></div></div>
-                <div id="miners-error" class="metric-error">Unable to load mining data. Please try again.</div>
-                <div id="miners-viz" class="visualization miners-viz"></div>
-            </div>
             <div class="metric-card nodes">
                 <div class="metric-header">
                     <h2>Network Nodes</h2>
@@ -296,6 +372,26 @@
                 <div id="nodes-loader" class="metric-loader"><div class="spinner"></div></div>
                 <div id="nodes-error" class="metric-error">Unable to load nodes map. Please try again.</div>
                 <div id="nodes-viz" class="visualization nodes-viz"></div>
+            </div>
+        </div>
+
+        <!-- Macro & Context section (moved to end) -->
+        <div class="metrics-grid" style="margin-bottom: 2rem;">
+            <div class="metric-card" id="macro-section">
+                <div class="metric-header">
+                    <h2>Macro & Context</h2>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    <div class="metric-tile"><div class="tile-label">GBP per USD</div><div class="tile-value" id="mc-gbpPerUsd">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">USD per GBP</div><div class="tile-value" id="mc-usdPerGbp">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 30d Change</div><div class="tile-value" id="mc-ch30">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y Change</div><div class="tile-value" id="mc-ch1y">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y High</div><div class="tile-value" id="mc-high">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">GBP/USD 1y Low</div><div class="tile-value" id="mc-low">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">Position in 1y Range</div><div class="tile-value" id="mc-pos">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">UK CPI YoY</div><div class="tile-value" id="mc-cpiUK">—</div></div>
+                    <div class="metric-tile"><div class="tile-label">US CPI YoY</div><div class="tile-value" id="mc-cpiUS">—</div></div>
+                </div>
             </div>
         </div>
     </div>
@@ -337,6 +433,12 @@
         })();
 
         let currentTimeRange = '30days';
+
+        // Currency state and FX fetch (shared across cards)
+        let fx = { mode: 'GBP', gbp_per_usd: 0.78 };
+        async function fetchFx(){
+            try{ const r=await fetch('/api/fx-rate'); if(r.ok){ const j=await r.json(); fx.gbp_per_usd=j.gbp_per_usd||fx.gbp_per_usd; } }catch(_){/*noop*/}
+        }
 
         // Cache for API responses to handle rate limiting
         const cache = {
@@ -640,6 +742,10 @@
             .on('mouseout', () => tooltip.style('opacity', 0));
         }
 
+        // CSS var helpers for D3 theming
+        function getCssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+        function cssVar(name, fallback){ const v=getCssVar(name); return v && v.length ? v : fallback; }
+
         function updateNodesVisualization(data) {
             const container = document.getElementById('nodes-viz');
             container.innerHTML = '';
@@ -754,13 +860,13 @@
                 const buttons = Array.from(document.querySelectorAll('.time-button'));
                 buttons.forEach(b => b.disabled = true);
                 try {
-                    // Update active button
+                // Update active button
                     buttons.forEach(btn => btn.classList.remove('active'));
                     e.currentTarget.classList.add('active');
 
-                    // Update data
+                // Update data
                     currentTimeRange = e.currentTarget.dataset.range;
-                    await fetchNetworkData(currentTimeRange);
+                await fetchNetworkData(currentTimeRange);
                 } finally {
                     const buttons = Array.from(document.querySelectorAll('.time-button'));
                     buttons.forEach(b => b.disabled = false);
@@ -769,10 +875,157 @@
             });
         });
 
+        // Basic tiles styling injection (keeps CSS block small)
+        (function injectTileStyles(){
+            const css = `
+            .metric-tile{background:var(--panel);border:1px solid rgba(148,163,184,0.25);border-radius:10px;padding:12px}
+            .tile-label{font-size:.8rem;color:var(--muted);margin-bottom:4px}
+            .tile-value{font-size:1.25rem;color:var(--text);font-weight:600}
+            `;
+            const s=document.createElement('style');s.textContent=css;document.head.appendChild(s);
+        })();
+
+        async function loadMacro(){
+            try{
+                const r = await fetch('/api/macro-context');
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                const m = await r.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                document.getElementById('mc-gbpPerUsd').textContent = f(m.gbp_per_usd,{maximumFractionDigits:4});
+                document.getElementById('mc-usdPerGbp').textContent = f(m.usd_per_gbp,{maximumFractionDigits:4});
+                document.getElementById('mc-ch30').textContent = f(m.gbp_per_usd_change_30d_pct,{maximumFractionDigits:2})+'%';
+                document.getElementById('mc-ch1y').textContent = f(m.gbp_per_usd_change_1y_pct,{maximumFractionDigits:2})+'%';
+                document.getElementById('mc-high').textContent = f(m.gbp_per_usd_1y_high,{maximumFractionDigits:4});
+                document.getElementById('mc-low').textContent = f(m.gbp_per_usd_1y_low,{maximumFractionDigits:4});
+                document.getElementById('mc-pos').textContent = f(m.gbp_per_usd_position_in_1y_range_pct,{maximumFractionDigits:1})+'%';
+                const uk = (m.uk_cpi_yoy_pct==null? '—' : m.uk_cpi_yoy_pct.toFixed(1)+'%') + (m.uk_cpi_yoy_date? ` (${m.uk_cpi_yoy_date})`:'');
+                const us = (m.us_cpi_yoy_pct==null? '—' : m.us_cpi_yoy_pct.toFixed(1)+'%') + (m.us_cpi_yoy_date? ` (${m.us_cpi_yoy_date})`:'');
+                document.getElementById('mc-cpiUK').textContent = uk;
+                document.getElementById('mc-cpiUS').textContent = us;
+            }catch(e){ console.error('macro-context fetch failed', e); }
+        }
+
+        async function loadMarketStructure(){
+            try{
+                console.log('[metrics] calling loadMarketStructure');
+                const res = await fetch('/api/market-structure');
+                if(!res.ok) throw new Error(`HTTP ${res.status}`);
+                const ms = await res.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                const toUSD = (gbp)=> gbp==null? null : (gbp / fx.gbp_per_usd);
+                const spotDisp = fx.mode==='GBP' ? {sym:'£', val: ms.spot_gbp} : {sym:'$', val: toUSD(ms.spot_gbp)};
+                const athDisp  = fx.mode==='GBP' ? {sym:'£', val: ms.ath_gbp}  : {sym:'$', val: toUSD(ms.ath_gbp)};
+                const smaDisp  = fx.mode==='GBP' ? {sym:'£', val: ms.sma200_gbp}: {sym:'$', val: toUSD(ms.sma200_gbp)};
+                document.getElementById('ms-spot').textContent = spotDisp.sym + f(spotDisp.val,{maximumFractionDigits:0});
+                document.getElementById('ms-ath').textContent  = athDisp.sym  + f(athDisp.val,{maximumFractionDigits:0});
+                document.getElementById('ms-dd').textContent = f(ms.drawdown_from_ath_pct,{maximumFractionDigits:2})+'%';
+                document.getElementById('ms-vol30').textContent = f(ms.volatility_30d_annualized_pct,{maximumFractionDigits:1})+'%';
+                document.getElementById('ms-vol90').textContent = f(ms.volatility_90d_annualized_pct,{maximumFractionDigits:1})+'%';
+                document.getElementById('ms-pctabove').textContent = f(ms.pct_days_above_current_pct,{maximumFractionDigits:1})+'%';
+                document.getElementById('ms-sma200').textContent = smaDisp.sym + f(smaDisp.val,{maximumFractionDigits:0});
+                document.getElementById('ms-mayer').textContent = f(ms.mayer_multiple,{maximumFractionDigits:3});
+                document.getElementById('ms-smaDist').textContent = f(ms.sma200_distance_pct,{maximumFractionDigits:2})+'%';
+                document.getElementById('ms-topDays').textContent = f(ms.days_since_cycle_top);
+                document.getElementById('ms-bottomDays').textContent = f(ms.days_since_cycle_bottom);
+                console.log('[metrics] loadMarketStructure done');
+            }catch(e){
+                console.error('market-structure fetch failed', e);
+            }
+        }
+
+        async function loadOnchainSupply(){
+            try{
+                console.log('[metrics] calling loadOnchainSupply');
+                const r = await fetch('/api/onchain-supply');
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                const s = await r.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                document.getElementById('oc-height').textContent = f(s.height);
+                document.getElementById('oc-epoch').textContent = f(s.epoch);
+                document.getElementById('oc-bth').textContent = f(s.blocks_to_halving);
+                document.getElementById('oc-eta').textContent = s.eta_utc ? new Date(s.eta_utc).toLocaleDateString('en-GB') : '—';
+                document.getElementById('oc-subsidy').textContent = f(s.current_subsidy_btc,{maximumFractionDigits:8});
+                document.getElementById('oc-issue').textContent = f(s.annual_issuance_btc,{maximumFractionDigits:0});
+                document.getElementById('oc-circ').textContent = f(s.circulating_supply,{maximumFractionDigits:0});
+                document.getElementById('oc-max').textContent = f(s.max_supply,{maximumFractionDigits:0});
+                document.getElementById('oc-circpct').textContent = f(s.circulating_pct_of_max,{maximumFractionDigits:2})+'%';
+                console.log('[metrics] loadOnchainSupply done');
+            }catch(e){
+                console.error('onchain-supply fetch failed', e);
+            }
+        }
+
+        async function loadMinerEconomics(){
+            try{
+                console.log('[metrics] calling loadMinerEconomics');
+                const r = await fetch('/api/miner-economics');
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                const m = await r.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                document.getElementById('me-hr').textContent = f(m.hashrate_7d_avg,{maximumFractionDigits:2});
+                const revUSD = m.miners_revenue_usd;
+                const feesUSD = m.fees_usd;
+                if(fx.mode==='GBP'){
+                    const revGBP = revUSD==null? null : revUSD*fx.gbp_per_usd;
+                    const feesGBP = feesUSD==null? null : feesUSD*fx.gbp_per_usd;
+                    document.getElementById('me-rev').textContent = '£'+f(revGBP,{maximumFractionDigits:0});
+                    document.getElementById('me-fees').textContent = '£'+f(feesGBP,{maximumFractionDigits:0});
+                } else {
+                    document.getElementById('me-rev').textContent = '$'+f(revUSD,{maximumFractionDigits:0});
+                    document.getElementById('me-fees').textContent = '$'+f(feesUSD,{maximumFractionDigits:0});
+                }
+                document.getElementById('me-feesPct').textContent = f(m.fees_pct_of_revenue,{maximumFractionDigits:2})+'%';
+                console.log('[metrics] loadMinerEconomics done');
+            }catch(e){
+                console.error('miner-economics fetch failed', e);
+            }
+        }
+
+        async function loadAdoptionUsage(){
+            try{
+                console.log('[metrics] calling loadAdoptionUsage');
+                const r = await fetch('/api/adoption-usage');
+                if(!r.ok) throw new Error(`HTTP ${r.status}`);
+                const a = await r.json();
+                const f = (n,opts)=> n==null? '—' : n.toLocaleString('en-GB',opts);
+                document.getElementById('au-ln').textContent = f(a.ln_capacity_btc,{maximumFractionDigits:2});
+                document.getElementById('au-aa').textContent = f(a.active_addresses,{maximumFractionDigits:0});
+                document.getElementById('au-tx').textContent = f(a.transactions_per_day,{maximumFractionDigits:0});
+                // fee in USD -> convert to GBP if needed
+                const feeUSD = a.avg_fee_per_tx_usd;
+                if(fx.mode==='GBP'){
+                    const feeGBP = feeUSD==null? null : feeUSD*fx.gbp_per_usd;
+                    document.getElementById('au-fee').textContent = feeGBP==null? '—' : '£'+feeGBP.toFixed(2);
+                } else {
+                    document.getElementById('au-fee').textContent = feeUSD==null? '—' : '$'+feeUSD.toFixed(2);
+                }
+                console.log('[metrics] loadAdoptionUsage done');
+            }catch(e){ console.error('adoption-usage fetch failed', e); }
+        }
+
         // Initial load
+        fetchFx().then(()=>{ console.log('[metrics] init loading...'); loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); setTimeout(loadMacro, 100); });
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
+
+        // Currency toggle wiring
+        document.getElementById('fxToggle').addEventListener('click', async ()=>{
+            fx.mode = fx.mode==='GBP' ? 'USD' : 'GBP';
+            document.getElementById('fxLabel').textContent = fx.mode;
+            await fetchFx();
+            // Re-render currency-sensitive tiles
+            await loadMarketStructure();
+            await loadMinerEconomics();
+            await loadAdoptionUsage();
+            // Price & Market: just re-fetch market structure (it returns GBP values); for now display GBP only
+            // Optionally, later extend backend to return USD too.
+        });
+
+        // Global error handler to surface script errors
+        window.addEventListener('error', (e)=>{
+            console.error('[metrics] Uncaught error:', e.message, e.filename, e.lineno);
+        });
     </script>
 </body>
 </html> 
