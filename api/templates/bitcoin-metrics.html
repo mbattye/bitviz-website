@@ -425,7 +425,8 @@
 
                 if (usersData) updateUsersVisualization(usersData); else uE && uE.classList.add('show');
                 if (minersData) updateMinersVisualization(minersData); else mE && mE.classList.add('show');
-                if (nodesData) updateNodesVisualization(nodesData); else nE && nE.classList.add('show');
+                // Always render map; if nodes unavailable, show map without nodes (no error overlay)
+                updateNodesVisualization(nodesData || { nodes: {} });
             } catch (error) {
                 console.error('Error in fetchNetworkData:', error);
             } finally {
@@ -678,7 +679,8 @@
 
                 // Process nodes data - using address field to get coordinates
                 const nodesArray = [];
-                for (const [nodeId, nodeInfo] of Object.entries(data.nodes)) {
+                const entries = data && data.nodes ? Object.entries(data.nodes) : [];
+                for (const [nodeId, nodeInfo] of entries) {
                     // The address field contains the IP:PORT
                     const address = nodeInfo[1];  // Get the address string
                     if (nodeInfo[8] && nodeInfo[9]) {  // Check if lat/lon exists
