@@ -946,7 +946,7 @@
         }
 
         // Initial load
-        fetchFx().then(()=>{ loadMacro(); loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); });
+        fetchFx().then(()=>{ /*loadMacro();*/ loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); });
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
@@ -960,7 +960,7 @@
             await loadMarketStructure();
             await loadMinerEconomics();
             await loadAdoptionUsage();
-            await loadMacro();
+            // await loadMacro();
             // Price & Market: just re-fetch market structure (it returns GBP values); for now display GBP only
             // Optionally, later extend backend to return USD too.
         });
