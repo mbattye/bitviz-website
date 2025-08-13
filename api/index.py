@@ -60,7 +60,8 @@ def nodes_latest():
                     return jsonify(cached['data'])
             except Exception:
                 pass
-        return jsonify({'error': str(e)}), 502
+        # Fallback: return empty structure so UI can render without error
+        return jsonify({'nodes': {}}), 200
 
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):
