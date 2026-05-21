@@ -55,6 +55,10 @@ def bitcoin_price():
 def bitcoin_metrics():
     return render_template('bitcoin-metrics.html')
 
+@app.route('/bitcoin-for-humans')
+def bitcoin_for_humans():
+    return render_template('bitcoin-for-humans.html')
+
 @app.route('/api/nodes-latest')
 def nodes_latest():
     try:

@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin for humans — BitViz</title>
+    <meta name="description" content="A first-principles walk through what makes Bitcoin special — from beads to gold to a shared protocol.">
+    <style>
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .story-wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 24px 4rem;
+        }
+
+        /* Hero */
+        .story-hero {
+            text-align: center;
+            padding: 5rem 0 3rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+        .story-hero .eyebrow {
+            color: var(--brand);
+            font-size: 0.78rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .story-hero h1 {
+            font-size: clamp(2.2rem, 6vw, 3.6rem);
+            line-height: 1.1;
+            margin: 0 0 1rem;
+            letter-spacing: -0.02em;
+            font-weight: 800;
+        }
+        .story-hero .lede {
+            max-width: 640px;
+            margin: 0 auto;
+            color: var(--muted);
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        .story-hero .by {
+            margin-top: 1.5rem;
+            color: var(--muted);
+            font-size: 0.85rem;
+            letter-spacing: 0.04em;
+        }
+        .story-hero .by a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .story-hero .by a:hover { text-decoration: underline; }
+
+        /* Sections */
+        .story-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(28px, 5vw, 72px);
+            align-items: center;
+            padding: 4.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .story-section:last-of-type { border-bottom: none; }
+
+        .story-section.flip .story-text { order: 2; }
+        .story-section.flip .story-art  { order: 1; }
+
+        .story-text .num {
+            display: inline-block;
+            color: var(--brand);
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            margin-bottom: 0.8rem;
+        }
+        .story-text h2 {
+            font-size: clamp(1.6rem, 3.4vw, 2.2rem);
+            line-height: 1.15;
+            margin: 0 0 1rem;
+            letter-spacing: -0.015em;
+            font-weight: 700;
+        }
+        .story-text p {
+            color: var(--muted);
+            font-size: 1.02rem;
+            line-height: 1.7;
+            margin: 0 0 1rem;
+        }
+        .story-text .pull {
+            margin: 1.25rem 0 0;
+            padding: 0.5rem 0 0.5rem 1rem;
+            border-left: 3px solid var(--brand);
+            color: var(--text);
+            font-style: italic;
+            font-size: 1.05rem;
+            line-height: 1.55;
+        }
+
+        /* Art panel */
+        .story-art {
+            position: relative;
+            aspect-ratio: 4 / 3;
+            width: 100%;
+            max-width: 520px;
+            margin: 0 auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 18px;
+            display: grid;
+            place-items: center;
+            box-shadow: 0 24px 60px -32px rgba(0,0,0,0.45);
+        }
+        .story-art svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .story-art .badge {
+            position: absolute;
+            top: -10px;
+            left: 18px;
+            background: var(--brand);
+            color: #0f172a;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            padding: 4px 10px;
+            border-radius: 999px;
+            text-transform: uppercase;
+        }
+
+        /* Reveal animation */
+        .story-section { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+        .story-section.in-view { opacity: 1; transform: none; }
+        @media (prefers-reduced-motion: reduce) {
+            .story-section { opacity: 1; transform: none; transition: none; }
+        }
+
+        /* Closing CTA */
+        .story-closing {
+            text-align: center;
+            padding: 4rem 0 1rem;
+        }
+        .story-closing h3 {
+            font-size: clamp(1.4rem, 3vw, 2rem);
+            margin: 0 0 1rem;
+        }
+        .story-closing p {
+            color: var(--muted);
+            max-width: 540px;
+            margin: 0 auto 1.5rem;
+        }
+        .story-closing .cta-row {
+            display: inline-flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .story-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 18px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+        }
+        .story-cta:hover { border-color: var(--brand); color: var(--brand); transform: translateY(-2px); }
+        .story-cta.primary { background: var(--brand); color: #0f172a; border-color: var(--brand); }
+        .story-cta.primary:hover { color: #0f172a; opacity: 0.92; }
+
+        /* Mobile */
+        @media (max-width: 760px) {
+            .story-wrap { padding: 0 16px 3rem; }
+            .story-hero { padding: 3rem 0 2rem; }
+            .story-section,
+            .story-section.flip { grid-template-columns: 1fr; gap: 24px; padding: 2.75rem 0; }
+            .story-section.flip .story-text { order: 1; }
+            .story-section.flip .story-art  { order: 2; }
+            .story-art { max-width: 380px; padding: 14px; }
+            .story-text p { font-size: 0.98rem; }
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/_header.html' %}
+
+    <article class="story-wrap">
+        <header class="story-hero">
+            <div class="eyebrow">Bitcoin for humans</div>
+            <h1>A short guide to the world's first hard digital money.</h1>
+            <p class="lede">
+                Eleven plain-English chapters on the problem Bitcoin tries to solve, how it works,
+                and why a 21-million-coin protocol with no CEO is a quietly radical idea.
+            </p>
+            <p class="by">An original BitViz essay · influenced by <a href="https://saifedean.com/thebitcoinstandard/" rel="noopener" target="_blank">The Bitcoin Standard</a> and the <a href="https://bitcoin.org/bitcoin.pdf" rel="noopener" target="_blank">Nakamoto whitepaper</a>.</p>
+        </header>
+
+        <!-- 01 -->
+        <section class="story-section" data-anim>
+            <div class="story-text">
+                <span class="num">01 · The problem</span>
+                <h2>There is no safe island of value.</h2>
+                <p>For ten thousand years humans have searched for something — anything — that holds its worth across time. Glass beads, polished stones, salt, cattle, gold, paper notes, government bonds. Each was the safe island of its era. Each was eventually washed over by the tide.</p>
+                <p>Value is contextual. A bead is only valuable if someone tomorrow still wants beads. Gold is only valuable if the people you'll trade with next year still believe in gold. Every store of value rests on the same fragile assumption: that other people will play the same game.</p>
+                <p class="pull">The only durable answer is a shared rule that no single person can rewrite. Bitcoin is that rule, expressed as code.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="A small island with a palm tree and a treasure chest, surrounded by tides.">
+                <span class="badge">01</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Sun -->
+                    <circle cx="380" cy="80" r="26" fill="var(--brand)" fill-opacity="0.16" stroke="var(--brand)"/>
+                    <!-- Island sand -->
+                    <path d="M 130 270 Q 240 200 350 270 Z" fill="var(--brand)" fill-opacity="0.14" stroke="none"/>
+                    <path d="M 130 270 Q 240 200 350 270"/>
+                    <!-- Palm trunk -->
+                    <path d="M 230 250 C 222 200 218 170 212 132"/>
+                    <!-- Palm leaves -->
+                    <path d="M 212 132 C 192 116 168 110 148 120"/>
+                    <path d="M 212 132 C 232 116 256 110 276 120"/>
+                    <path d="M 212 132 C 204 108 198 88 188 70"/>
+                    <path d="M 212 132 C 222 108 232 92 244 78"/>
+                    <!-- Chest -->
+                    <rect x="270" y="232" width="78" height="40" rx="4"/>
+                    <line x1="270" y1="248" x2="348" y2="248"/>
+                    <rect x="302" y="246" width="14" height="9" rx="1.5" fill="var(--brand)" stroke="var(--brand)"/>
+                    <!-- Question mark -->
+                    <text x="309" y="222" text-anchor="middle" font-size="26" font-weight="800" fill="var(--brand)" stroke="none" font-family="-apple-system, sans-serif">?</text>
+                    <!-- Waves -->
+                    <path d="M 10 295 Q 60 285 110 295 T 210 295 T 310 295 T 410 295 T 480 295"/>
+                    <path d="M 0 320 Q 50 310 100 320 T 200 320 T 300 320 T 400 320 T 480 320" opacity="0.7"/>
+                    <path d="M 10 345 Q 60 335 110 345 T 210 345 T 310 345 T 410 345 T 480 345" opacity="0.45"/>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 02 -->
+        <section class="story-section flip" data-anim>
+            <div class="story-text">
+                <span class="num">02 · The pattern</span>
+                <h2>Every store of value eventually leaks.</h2>
+                <p>On the island of Yap, giant stone disks were money for centuries — until outsiders arrived with steel tools, made the stones cheaply, and the system unravelled. The pattern is consistent: whenever humans can produce more of a money, eventually they do.</p>
+                <p>Gold lasted longest because nature limits its supply. But governments could print paper claims against it, then break those claims when it suited them — 1933, 1971. Modern fiat currencies leak slowly through inflation: a 1971 pound buys less than a tenth of what it used to.</p>
+                <p>For the first time, Bitcoin offers a money whose supply cannot be expanded by anyone — not a king, not a central bank, not a clever engineer.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="A line of historical monies — beads, gold, paper — ending in a Bitcoin symbol.">
+                <span class="badge">02</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- 4 items in a 2x2 grid, with arrows flowing -->
+                    <!-- beads (top-left) -->
+                    <g transform="translate(60, 70)">
+                        <path d="M 0 30 Q 30 60 60 30 T 120 30" stroke-dasharray="0"/>
+                        <circle cx="6"  cy="38" r="9" fill="var(--accent)" fill-opacity="0.30" stroke="currentColor"/>
+                        <circle cx="30" cy="50" r="9" fill="var(--accent)" fill-opacity="0.30" stroke="currentColor"/>
+                        <circle cx="56" cy="46" r="9" fill="var(--accent)" fill-opacity="0.30" stroke="currentColor"/>
+                        <circle cx="82" cy="50" r="9" fill="var(--accent)" fill-opacity="0.30" stroke="currentColor"/>
+                        <circle cx="108" cy="38" r="9" fill="var(--accent)" fill-opacity="0.30" stroke="currentColor"/>
+                        <text x="60" y="92" text-anchor="middle" font-size="13" fill="currentColor" stroke="none" font-weight="500">beads</text>
+                    </g>
+                    <!-- gold bar (top-right) -->
+                    <g transform="translate(290, 60)">
+                        <path d="M 12 50 L 32 28 L 90 28 L 110 50 L 90 72 L 32 72 Z" fill="var(--brand)" fill-opacity="0.22" stroke="var(--brand)"/>
+                        <line x1="32" y1="28" x2="32" y2="72" stroke="var(--brand)"/>
+                        <line x1="90" y1="28" x2="90" y2="72" stroke="var(--brand)"/>
+                        <text x="60" y="100" text-anchor="middle" font-size="13" fill="currentColor" stroke="none" font-weight="500">gold</text>
+                    </g>
+                    <!-- arrow top to bottom row -->
+                    <path d="M 350 130 C 360 160 320 180 240 200" stroke-dasharray="4 4"/>
+                    <!-- banknote (bottom-left) -->
+                    <g transform="translate(60, 200)">
+                        <rect x="0" y="20" width="120" height="62" rx="4"/>
+                        <circle cx="60" cy="51" r="13"/>
+                        <line x1="14" y1="32" x2="24" y2="32"/>
+                        <line x1="96" y1="70" x2="106" y2="70"/>
+                        <text x="60" y="100" text-anchor="middle" font-size="13" fill="currentColor" stroke="none" font-weight="500">paper</text>
+                    </g>
+                    <!-- arrow left to right bottom -->
+                    <path d="M 195 240 C 230 250 260 245 285 240" stroke-dasharray="4 4"/>
+                    <!-- Bitcoin (bottom-right, highlighted) -->
+                    <g transform="translate(290, 200)">
+                        <circle cx="60" cy="50" r="34" fill="var(--brand)" fill-opacity="0.18" stroke="var(--brand)" stroke-width="2.4"/>
+                        <text x="60" y="62" text-anchor="middle" font-size="38" font-weight="800" fill="var(--brand)" stroke="none" font-family="-apple-system, sans-serif">₿</text>
+                        <text x="60" y="105" text-anchor="middle" font-size="13" fill="var(--brand)" stroke="none" font-weight="700">bitcoin</text>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 03 -->
+        <section class="story-section" data-anim>
+            <div class="story-text">
+                <span class="num">03 · The blueprint</span>
+                <h2>Six properties of sound money.</h2>
+                <p>Economists have long agreed on what makes a store of value durable. Money should be <strong style="color:var(--text)">durable, divisible, portable, fungible, recognisable</strong> and — most importantly — <strong style="color:var(--text)">scarce</strong>.</p>
+                <p>Gold scored well on five of these. It failed on portability — moving it is hard, verifying it is harder. Paper money solved portability but reintroduced unlimited supply. Each generation of money has had its weak link.</p>
+                <p class="pull">Bitcoin is the first money that scores well on every property at once — and it does so without a central issuer.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="A hexagon showing the six properties of sound money.">
+                <span class="badge">03</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- hexagon -->
+                    <polygon points="240,40 380,120 380,240 240,320 100,240 100,120"
+                             fill="var(--brand)" fill-opacity="0.06" stroke="var(--brand)" stroke-width="1.5"/>
+                    <!-- center ₿ -->
+                    <circle cx="240" cy="180" r="38" fill="var(--bg)" stroke="var(--brand)" stroke-width="2.4"/>
+                    <text x="240" y="194" text-anchor="middle" font-size="36" font-weight="800" fill="var(--brand)" stroke="none" font-family="-apple-system, sans-serif">₿</text>
+                    <!-- 6 labels around vertices -->
+                    <g font-size="13" stroke="none" fill="currentColor" font-weight="600" text-anchor="middle">
+                        <text x="240" y="28">durable</text>
+                        <text x="408" y="124">divisible</text>
+                        <text x="408" y="248">portable</text>
+                        <text x="240" y="346">fungible</text>
+                        <text x="72" y="248">recognisable</text>
+                        <text x="74" y="124">scarce</text>
+                    </g>
+                    <!-- spokes -->
+                    <g stroke="var(--brand)" stroke-opacity="0.35" stroke-dasharray="3 4">
+                        <line x1="240" y1="142" x2="240" y2="56"/>
+                        <line x1="272" y1="160" x2="364" y2="124"/>
+                        <line x1="272" y1="200" x2="364" y2="240"/>
+                        <line x1="240" y1="218" x2="240" y2="304"/>
+                        <line x1="208" y1="200" x2="116" y2="240"/>
+                        <line x1="208" y1="160" x2="116" y2="124"/>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 04 -->
+        <section class="story-section flip" data-anim>
+            <div class="story-text">
+                <span class="num">04 · The hard cap</span>
+                <h2>A supply schedule that cannot be changed.</h2>
+                <p>Bitcoin's most radical invention isn't the cryptography — it's the agreement. Every node in the network verifies, independently, that no more than 21,000,000 BTC will ever exist.</p>
+                <p>Issuance halves every four years, by design. Today new BTC arrives at a slower rate than gold. By 2032 it will be slower still. By 2140, no new BTC will be created.</p>
+                <p>For the first time in history, the future supply of a money is fully knowable, by anyone, in advance.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="A supply curve rising and flattening at twenty-one million.">
+                <span class="badge">04</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- axes -->
+                    <line x1="60" y1="50" x2="60" y2="300"/>
+                    <line x1="60" y1="300" x2="430" y2="300"/>
+                    <text x="55" y="40" text-anchor="end" font-size="11" stroke="none" fill="var(--muted)" font-weight="500">BTC</text>
+                    <text x="430" y="320" text-anchor="end" font-size="11" stroke="none" fill="var(--muted)" font-weight="500">year</text>
+                    <!-- 21M dashed line -->
+                    <line x1="60" y1="80" x2="430" y2="80" stroke="var(--brand)" stroke-dasharray="5 5" stroke-opacity="0.6"/>
+                    <text x="430" y="74" text-anchor="end" font-size="12" fill="var(--brand)" stroke="none" font-weight="700">21,000,000</text>
+                    <!-- curve: starts at (60,300), rises steeply, flattens to 80 -->
+                    <path d="M 60 300 Q 90 200 130 150 T 220 100 T 360 84 T 430 80"
+                          stroke="var(--brand)" stroke-width="3" fill="none"/>
+                    <!-- shaded area below -->
+                    <path d="M 60 300 Q 90 200 130 150 T 220 100 T 360 84 T 430 80 L 430 300 Z"
+                          fill="var(--brand)" fill-opacity="0.13" stroke="none"/>
+                    <!-- halving markers -->
+                    <g stroke="var(--muted)" stroke-opacity="0.4" stroke-dasharray="2 4">
+                        <line x1="130" y1="80" x2="130" y2="300"/>
+                        <line x1="220" y1="80" x2="220" y2="300"/>
+                        <line x1="310" y1="80" x2="310" y2="300"/>
+                    </g>
+                    <g font-size="10" stroke="none" fill="var(--muted)" text-anchor="middle">
+                        <text x="130" y="316">halving</text>
+                        <text x="220" y="316">halving</text>
+                        <text x="310" y="316">halving</text>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 05 -->
+        <section class="story-section" data-anim>
+            <div class="story-text">
+                <span class="num">05 · The ledger</span>
+                <h2>A ledger anyone can read, nobody can fake.</h2>
+                <p>At its core, Bitcoin is a list of who owns what. The trick is that the list is held by tens of thousands of computers around the world, and they constantly check each other's work.</p>
+                <p>Every ten minutes or so, new transactions are bundled into a <em>block</em> and stitched to the previous block with a cryptographic seal. Change one transaction, even years later, and every seal downstream becomes obviously invalid. The whole network rejects the lie.</p>
+                <p class="pull">A book that anyone can read, but nobody can edit, is a remarkable new thing.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="A chain of four blocks linked together, each containing transaction dots.">
+                <span class="badge">05</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- 4 blocks -->
+                    <g font-size="10" font-weight="600">
+                        <g transform="translate(30, 130)">
+                            <rect width="80" height="100" rx="6" fill="var(--brand)" fill-opacity="0.06"/>
+                            <text x="40" y="20" text-anchor="middle" stroke="none" fill="var(--muted)">#n-3</text>
+                            <circle cx="22" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="58" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="22" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="22" cy="78" r="3" fill="var(--brand)" stroke="none"/>
+                            <line x1="14" y1="92" x2="66" y2="92" stroke="var(--muted)" stroke-opacity="0.6"/>
+                        </g>
+                        <g transform="translate(140, 130)">
+                            <rect width="80" height="100" rx="6" fill="var(--brand)" fill-opacity="0.06"/>
+                            <text x="40" y="20" text-anchor="middle" stroke="none" fill="var(--muted)">#n-2</text>
+                            <circle cx="22" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="58" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="22" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="58" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="22" cy="78" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="78" r="3" fill="var(--brand)" stroke="none"/>
+                            <line x1="14" y1="92" x2="66" y2="92" stroke="var(--muted)" stroke-opacity="0.6"/>
+                        </g>
+                        <g transform="translate(250, 130)">
+                            <rect width="80" height="100" rx="6" fill="var(--brand)" fill-opacity="0.06"/>
+                            <text x="40" y="20" text-anchor="middle" stroke="none" fill="var(--muted)">#n-1</text>
+                            <circle cx="22" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="22" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="58" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="22" cy="78" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="78" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="58" cy="78" r="3" fill="var(--brand)" stroke="none"/>
+                            <line x1="14" y1="92" x2="66" y2="92" stroke="var(--muted)" stroke-opacity="0.6"/>
+                        </g>
+                        <g transform="translate(360, 130)">
+                            <rect width="80" height="100" rx="6" fill="var(--brand)" fill-opacity="0.18" stroke="var(--brand)"/>
+                            <text x="40" y="20" text-anchor="middle" stroke="none" fill="var(--brand)">#n (tip)</text>
+                            <circle cx="22" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="58" cy="42" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="22" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <circle cx="40" cy="60" r="3" fill="var(--brand)" stroke="none"/>
+                            <line x1="14" y1="92" x2="66" y2="92" stroke="var(--brand)" stroke-opacity="0.6"/>
+                        </g>
+                    </g>
+                    <!-- chain links between blocks -->
+                    <g stroke="var(--brand)" stroke-width="2.4">
+                        <line x1="110" y1="180" x2="140" y2="180"/>
+                        <line x1="220" y1="180" x2="250" y2="180"/>
+                        <line x1="330" y1="180" x2="360" y2="180"/>
+                    </g>
+                    <g fill="var(--brand)" stroke="none">
+                        <circle cx="125" cy="180" r="3"/>
+                        <circle cx="235" cy="180" r="3"/>
+                        <circle cx="345" cy="180" r="3"/>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 06 -->
+        <section class="story-section flip" data-anim>
+            <div class="story-text">
+                <span class="num">06 · Energy as truth</span>
+                <h2>Proof of work anchors Bitcoin to physical reality.</h2>
+                <p>To add a block, a miner must spend electricity — solving a deliberately wasteful puzzle that has no shortcut. Verifying the answer is trivial. Producing it takes real-world energy.</p>
+                <p>This is what ties Bitcoin to the physical world. Rewriting history isn't a matter of editing a file; it's a matter of out-spending every honest miner on Earth, in real watts and joules. Energy, the most universal cost in the universe, becomes the proof that someone actually showed up.</p>
+                <p>Other systems try to skip this step. They end up trusting whoever holds the most tokens, or the most votes, or the loudest microphone. Proof of work trusts physics.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="Electricity feeding a mining computer, which produces a verified block.">
+                <span class="badge">06</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Lightning input -->
+                    <g transform="translate(30, 130)" stroke="var(--brand)" fill="var(--brand)" fill-opacity="0.25">
+                        <path d="M 40 0 L 14 60 L 32 60 L 18 110 L 60 40 L 38 40 L 50 0 Z"/>
+                    </g>
+                    <text x="60" y="270" text-anchor="middle" font-size="12" stroke="none" fill="var(--muted)" font-weight="500">energy</text>
+                    <!-- Arrow -->
+                    <path d="M 110 185 L 150 185" stroke="var(--muted)"/>
+                    <path d="M 145 180 L 150 185 L 145 190" stroke="var(--muted)"/>
+                    <!-- Server rack -->
+                    <g transform="translate(160, 120)">
+                        <rect x="0" y="0" width="120" height="130" rx="8"/>
+                        <line x1="0" y1="30" x2="120" y2="30"/>
+                        <line x1="0" y1="60" x2="120" y2="60"/>
+                        <line x1="0" y1="90" x2="120" y2="90"/>
+                        <circle cx="14" cy="15" r="3" fill="var(--positive)" stroke="none"/>
+                        <circle cx="26" cy="15" r="3" fill="var(--muted)" stroke="none"/>
+                        <circle cx="14" cy="45" r="3" fill="var(--positive)" stroke="none"/>
+                        <circle cx="26" cy="45" r="3" fill="var(--muted)" stroke="none"/>
+                        <circle cx="14" cy="75" r="3" fill="var(--positive)" stroke="none"/>
+                        <circle cx="14" cy="105" r="3" fill="var(--positive)" stroke="none"/>
+                        <circle cx="26" cy="105" r="3" fill="var(--muted)" stroke="none"/>
+                    </g>
+                    <text x="220" y="270" text-anchor="middle" font-size="12" stroke="none" fill="var(--muted)" font-weight="500">miner</text>
+                    <!-- Arrow -->
+                    <path d="M 295 185 L 335 185" stroke="var(--muted)"/>
+                    <path d="M 330 180 L 335 185 L 330 190" stroke="var(--muted)"/>
+                    <!-- Block with check -->
+                    <g transform="translate(345, 130)">
+                        <rect x="0" y="0" width="100" height="110" rx="8" fill="var(--brand)" fill-opacity="0.18" stroke="var(--brand)" stroke-width="2.4"/>
+                        <path d="M 30 56 L 46 72 L 74 40" stroke="var(--brand)" stroke-width="3"/>
+                    </g>
+                    <text x="395" y="270" text-anchor="middle" font-size="12" stroke="none" fill="var(--brand)" font-weight="700">verified block</text>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 07 -->
+        <section class="story-section" data-anim>
+            <div class="story-text">
+                <span class="num">07 · No king, no committee</span>
+                <h2>Decentralised, by design.</h2>
+                <p>There is no Bitcoin headquarters. No CEO. No server you can unplug. The protocol runs on thousands of independent nodes; the math runs on thousands of independent miners.</p>
+                <p>Computer scientists call this <em>Byzantine fault tolerance</em>: the network reaches agreement on the truth even when some participants lie, fail, or actively attack. It is also <em>Sybil-resistant</em> — you can't simulate a thousand identities to vote yourself rich, because identity in Bitcoin is bought with energy, not signups.</p>
+                <p class="pull">No one owns Bitcoin, the way no one owns email.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="A web of interconnected nodes with no central authority.">
+                <span class="badge">07</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Connection lines -->
+                    <g stroke="var(--brand)" stroke-opacity="0.25">
+                        <line x1="100" y1="80" x2="200" y2="120"/>
+                        <line x1="200" y1="120" x2="320" y2="80"/>
+                        <line x1="320" y1="80" x2="380" y2="150"/>
+                        <line x1="100" y1="80" x2="80" y2="200"/>
+                        <line x1="80" y1="200" x2="180" y2="220"/>
+                        <line x1="180" y1="220" x2="280" y2="210"/>
+                        <line x1="280" y1="210" x2="380" y2="150"/>
+                        <line x1="200" y1="120" x2="180" y2="220"/>
+                        <line x1="200" y1="120" x2="280" y2="210"/>
+                        <line x1="80" y1="200" x2="160" y2="300"/>
+                        <line x1="160" y1="300" x2="280" y2="290"/>
+                        <line x1="280" y1="290" x2="400" y2="280"/>
+                        <line x1="400" y1="280" x2="380" y2="150"/>
+                        <line x1="280" y1="210" x2="400" y2="280"/>
+                        <line x1="160" y1="300" x2="180" y2="220"/>
+                        <line x1="100" y1="80" x2="200" y2="120"/>
+                        <line x1="180" y1="220" x2="280" y2="290"/>
+                    </g>
+                    <!-- Nodes -->
+                    <g>
+                        <circle cx="100" cy="80"  r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="200" cy="120" r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="320" cy="80"  r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="80"  cy="200" r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="180" cy="220" r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="280" cy="210" r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="380" cy="150" r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="160" cy="300" r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="280" cy="290" r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                        <circle cx="400" cy="280" r="9" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)"/>
+                    </g>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 08 -->
+        <section class="story-section flip" data-anim>
+            <div class="story-text">
+                <span class="num">08 · The honest cost</span>
+                <h2>Finality takes time. That's the point.</h2>
+                <p>A Bitcoin transaction takes about ten minutes to land in a block, and customarily an hour (six blocks) to be considered settled. Compare this with a card swipe (one company says yes) or a bank wire (a closed network reconciles overnight).</p>
+                <p>Bitcoin's base layer is slower because it is achieving something genuinely harder — consensus among strangers, with no referee. Speed and global agreement pull in opposite directions; Bitcoin chose the harder side, on purpose.</p>
+                <p>The base layer is the final settlement court. For coffee, we have other layers.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="A balance scale weighing speed against consensus.">
+                <span class="badge">08</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Fulcrum -->
+                    <line x1="240" y1="100" x2="240" y2="290"/>
+                    <path d="M 200 290 L 240 270 L 280 290 Z" fill="currentColor" fill-opacity="0.15"/>
+                    <!-- Beam (tilted toward consensus) -->
+                    <line x1="120" y1="140" x2="360" y2="100" stroke-width="2.4"/>
+                    <!-- Left pan (consensus, heavier) -->
+                    <line x1="120" y1="140" x2="120" y2="170"/>
+                    <path d="M 80 170 Q 120 195 160 170" fill="var(--brand)" fill-opacity="0.2" stroke="var(--brand)"/>
+                    <text x="120" y="220" text-anchor="middle" font-size="14" stroke="none" fill="var(--brand)" font-weight="700">consensus</text>
+                    <text x="120" y="238" text-anchor="middle" font-size="11" stroke="none" fill="var(--muted)">global agreement</text>
+                    <!-- Right pan (speed, lighter) -->
+                    <line x1="360" y1="100" x2="360" y2="130"/>
+                    <path d="M 320 130 Q 360 155 400 130" fill="currentColor" fill-opacity="0.06" stroke="currentColor"/>
+                    <text x="360" y="180" text-anchor="middle" font-size="14" stroke="none" fill="currentColor" font-weight="700">speed</text>
+                    <text x="360" y="198" text-anchor="middle" font-size="11" stroke="none" fill="var(--muted)">instant</text>
+                    <!-- Pivot point -->
+                    <circle cx="240" cy="118" r="6" fill="var(--brand)" stroke="var(--brand)"/>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 09 -->
+        <section class="story-section" data-anim>
+            <div class="story-text">
+                <span class="num">09 · The self-regulating clock</span>
+                <h2>Ten minutes a block, forever.</h2>
+                <p>As more miners join the network, blocks would naturally be found faster; as they leave, slower. Bitcoin solves this with an automatic, network-wide <em>difficulty adjustment</em> every 2,016 blocks — roughly every two weeks.</p>
+                <p>If the previous fortnight ran fast, the puzzle gets harder. If it ran slow, the puzzle gets easier. The target is always the same: one block every ten minutes.</p>
+                <p class="pull">No central bank, no committee, no override switch — just code reacting to reality.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="An oscillating signal being pulled toward a flat ten-minute target line.">
+                <span class="badge">09</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- target line -->
+                    <line x1="40" y1="180" x2="440" y2="180" stroke="var(--brand)" stroke-width="2.4" stroke-dasharray="6 6"/>
+                    <text x="440" y="172" text-anchor="end" font-size="12" fill="var(--brand)" stroke="none" font-weight="700">target: 10 min/block</text>
+                    <!-- noisy signal that converges -->
+                    <path d="M 40 250 Q 70 110 100 240 T 160 130 T 220 215 T 280 165 T 340 190 T 400 178 T 440 180"
+                          stroke="currentColor" stroke-width="2.2"/>
+                    <!-- arrows showing adjustment -->
+                    <g stroke="var(--brand)" stroke-opacity="0.7">
+                        <path d="M 100 240 L 100 200"/><path d="M 95 205 L 100 200 L 105 205"/>
+                        <path d="M 160 130 L 160 170"/><path d="M 155 165 L 160 170 L 165 165"/>
+                    </g>
+                    <text x="40" y="320" font-size="12" stroke="none" fill="var(--muted)" font-weight="500">harder</text>
+                    <text x="40" y="50" font-size="12" stroke="none" fill="var(--muted)" font-weight="500">easier</text>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 10 -->
+        <section class="story-section flip" data-anim>
+            <div class="story-text">
+                <span class="num">10 · Layer 2</span>
+                <h2>Lightning — settlement at the speed of light.</h2>
+                <p>Bitcoin's base layer settles infrequently — and that's a feature. For everyday spending, the <strong style="color:var(--text)">Lightning Network</strong> sits on top. Two parties open a private channel anchored to the main chain, then exchange unlimited transactions between themselves at essentially zero cost and zero delay.</p>
+                <p>When they're done, only the net balance gets recorded on Bitcoin. It's the same architecture banks have used for centuries — clear privately, settle publicly — but newly available to anyone with a phone.</p>
+                <p>Coffee at the corner shop, a streamed micropayment to a writer, an instant settlement between two countries — all on top of a base layer of granite.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="Two figures exchanging value over a Lightning channel anchored to the chain.">
+                <span class="badge">10</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Person A -->
+                    <g transform="translate(60, 80)">
+                        <circle cx="40" cy="30" r="22"/>
+                        <path d="M 8 110 C 8 75 72 75 72 110"/>
+                    </g>
+                    <!-- Person B -->
+                    <g transform="translate(330, 80)">
+                        <circle cx="40" cy="30" r="22"/>
+                        <path d="M 8 110 C 8 75 72 75 72 110"/>
+                    </g>
+                    <!-- Channel line -->
+                    <line x1="140" y1="120" x2="340" y2="120" stroke="var(--brand)" stroke-width="2.4" stroke-dasharray="6 6"/>
+                    <!-- Lightning bolt above channel -->
+                    <g transform="translate(220, 60)" fill="var(--brand)" fill-opacity="0.85" stroke="var(--brand)">
+                        <path d="M 22 0 L 0 36 L 14 36 L 4 70 L 40 22 L 22 22 L 32 0 Z"/>
+                    </g>
+                    <!-- Anchor lines down to chain -->
+                    <g stroke="var(--brand)" stroke-opacity="0.45" stroke-dasharray="3 5">
+                        <line x1="100" y1="200" x2="100" y2="260"/>
+                        <line x1="380" y1="200" x2="380" y2="260"/>
+                    </g>
+                    <!-- Chain (base layer) -->
+                    <g transform="translate(0, 260)">
+                        <rect x="30" y="0" width="60" height="50" rx="6" fill="var(--brand)" fill-opacity="0.08"/>
+                        <rect x="110" y="0" width="60" height="50" rx="6" fill="var(--brand)" fill-opacity="0.08"/>
+                        <rect x="190" y="0" width="60" height="50" rx="6" fill="var(--brand)" fill-opacity="0.08"/>
+                        <rect x="270" y="0" width="60" height="50" rx="6" fill="var(--brand)" fill-opacity="0.08"/>
+                        <rect x="350" y="0" width="60" height="50" rx="6" fill="var(--brand)" fill-opacity="0.08"/>
+                        <g stroke="var(--brand)">
+                            <line x1="90" y1="25" x2="110" y2="25"/>
+                            <line x1="170" y1="25" x2="190" y2="25"/>
+                            <line x1="250" y1="25" x2="270" y2="25"/>
+                            <line x1="330" y1="25" x2="350" y2="25"/>
+                        </g>
+                    </g>
+                    <text x="240" y="345" text-anchor="middle" font-size="12" stroke="none" fill="var(--muted)" font-weight="500">base layer</text>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 11 -->
+        <section class="story-section" data-anim>
+            <div class="story-text">
+                <span class="num">11 · Why it matters</span>
+                <h2>Hard money, in a world of soft promises.</h2>
+                <p>Bitcoin is not for everyone yet, and it doesn't have to be. It is, however, the first credibly fixed-supply money in human history — a savings technology that doesn't require trusting a government, a bank, or a billionaire.</p>
+                <p>In a world where the rules of money are written and rewritten by people in rooms you'll never enter, Bitcoin offers a different idea: rules written once, in the open, and enforced by everyone.</p>
+                <p class="pull">A protocol, not a promise.</p>
+            </div>
+            <div class="story-art" role="img" aria-label="A Bitcoin symbol orbited by quiet light.">
+                <span class="badge">11</span>
+                <svg viewBox="0 0 480 360" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Outer rings -->
+                    <circle cx="240" cy="180" r="130" stroke="var(--brand)" stroke-opacity="0.3" stroke-dasharray="3 6"/>
+                    <circle cx="240" cy="180" r="100" stroke="var(--brand)" stroke-opacity="0.45" stroke-dasharray="2 5"/>
+                    <!-- Central coin -->
+                    <circle cx="240" cy="180" r="70" fill="var(--brand)" fill-opacity="0.16" stroke="var(--brand)" stroke-width="2.4"/>
+                    <text x="240" y="206" text-anchor="middle" font-size="76" font-weight="800" fill="var(--brand)" stroke="none" font-family="-apple-system, sans-serif">₿</text>
+                    <!-- Orbiting dots -->
+                    <circle cx="370" cy="180" r="5" fill="var(--accent)" stroke="none"/>
+                    <circle cx="110" cy="180" r="5" fill="var(--accent)" stroke="none"/>
+                    <circle cx="240" cy="50"  r="5" fill="var(--accent)" stroke="none"/>
+                    <circle cx="240" cy="310" r="5" fill="var(--accent)" stroke="none"/>
+                </svg>
+            </div>
+        </section>
+
+        <footer class="story-closing">
+            <h3>Ready to look at the network?</h3>
+            <p>Now that you've seen the rules, see them running in real time — hashrate, halving countdown, supply, fees, miners, and macro context.</p>
+            <div class="cta-row">
+                <a class="story-cta primary" href="/bitcoin-metrics">Open the network metrics →</a>
+                <a class="story-cta" href="/bitcoin-price">Just the price</a>
+            </div>
+        </footer>
+    </article>
+
+    <script>
+    (function(){
+        // Reveal sections as they enter the viewport
+        if (!('IntersectionObserver' in window)) {
+            document.querySelectorAll('.story-section').forEach(el => el.classList.add('in-view'));
+            return;
+        }
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('in-view');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15 });
+        document.querySelectorAll('.story-section').forEach(el => observer.observe(el));
+    })();
+    </script>
+</body>
+</html>
