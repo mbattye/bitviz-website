@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin, priced in real things — BitViz</title>
+    <meta name="description" content="What does Bitcoin actually buy — in milk, salaries, houses, gold? And what would you have today if you'd put a bit aside each month?">
+    <style>
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .saver-wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 24px 4rem;
+        }
+
+        /* Hero */
+        .saver-hero {
+            text-align: center;
+            padding: 4.5rem 0 3rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 3rem;
+        }
+        .saver-hero .eyebrow {
+            color: var(--brand);
+            font-size: 0.78rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        .saver-hero h1 {
+            font-size: clamp(2.2rem, 5.5vw, 3.4rem);
+            line-height: 1.1;
+            margin: 0 0 1rem;
+            letter-spacing: -0.02em;
+            font-weight: 800;
+        }
+        .saver-hero .lede {
+            max-width: 660px;
+            margin: 0 auto 2.5rem;
+            color: var(--muted);
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .hero-stat {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 18px;
+        }
+        .hero-stat .hs-label {
+            color: var(--muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        }
+        .hero-stat .hs-value {
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            font-weight: 800;
+            color: var(--brand);
+            font-variant-numeric: tabular-nums;
+            line-height: 1.05;
+        }
+        .hero-stat .hs-sub {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        /* Section headings */
+        .saver-section {
+            padding: 3rem 0 2rem;
+        }
+        .saver-section h2 {
+            font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+            margin: 0 0 0.6rem;
+            letter-spacing: -0.015em;
+            font-weight: 700;
+        }
+        .saver-section .section-blurb {
+            color: var(--muted);
+            font-size: 1.02rem;
+            line-height: 1.7;
+            max-width: 720px;
+            margin: 0 0 2rem;
+        }
+
+        /* Priced-in grid */
+        .priced-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+        }
+        .priced-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 22px 20px 18px;
+            position: relative;
+            overflow: hidden;
+        }
+        .priced-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--brand), transparent);
+            opacity: 0.7;
+        }
+        .priced-card .pc-label {
+            color: var(--muted);
+            font-size: 0.78rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+        .priced-card .pc-headline {
+            font-size: 1.05rem;
+            line-height: 1.4;
+            margin: 0 0 4px;
+            color: var(--muted);
+        }
+        .priced-card .pc-headline strong {
+            font-size: 1.8rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: var(--brand);
+            display: block;
+            margin: 4px 0 6px;
+            line-height: 1.05;
+            letter-spacing: -0.015em;
+        }
+        .priced-card .pc-flip {
+            font-size: 0.88rem;
+            color: var(--muted);
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border);
+        }
+        .priced-card .pc-flip strong {
+            color: var(--text);
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+        .priced-card .pc-as-of {
+            font-size: 0.7rem;
+            color: var(--muted);
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* DCA section */
+        .dca-wrap {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: clamp(20px, 3vw, 36px);
+        }
+        .dca-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 2rem;
+        }
+        .dca-control { display: flex; flex-direction: column; gap: 6px; }
+        .dca-control label {
+            color: var(--muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+        }
+        .dca-control input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 1.05rem;
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .dca-control input:focus {
+            outline: 2px solid var(--brand);
+            outline-offset: 1px;
+            border-color: var(--brand);
+        }
+
+        .dca-summary {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 1.5rem;
+        }
+        .dca-summary-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+        }
+        .dca-summary-card .dsc-label {
+            color: var(--muted);
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .dca-summary-card .dsc-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+        }
+        .dca-summary-card .dsc-sub {
+            color: var(--muted);
+            font-size: 0.78rem;
+            margin-top: 2px;
+        }
+
+        .dca-bars {
+            display: grid;
+            gap: 14px;
+        }
+        .dca-bar {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            align-items: center;
+            gap: 14px;
+        }
+        .dca-bar-key {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .dca-bar-key .swatch {
+            width: 14px; height: 14px;
+            border-radius: 4px;
+            flex: 0 0 auto;
+        }
+        .dca-bar-key.btc .swatch  { background: var(--brand); }
+        .dca-bar-key.ftse .swatch { background: var(--accent); }
+        .dca-bar-key.cash .swatch { background: var(--muted); opacity: 0.7; }
+        .dca-bar-track {
+            position: relative;
+            background: var(--bg);
+            border-radius: 999px;
+            height: 38px;
+            overflow: hidden;
+        }
+        .dca-bar-fill {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            border-radius: 999px;
+            width: 0;
+            transition: width 0.7s ease;
+        }
+        .dca-bar-fill.btc  { background: linear-gradient(90deg, var(--brand), #ffb24d); }
+        .dca-bar-fill.ftse { background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, white)); }
+        .dca-bar-fill.cash { background: var(--muted); opacity: 0.5; }
+        .dca-bar-label {
+            position: absolute;
+            top: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            font-size: 0.95rem;
+            color: var(--text);
+            pointer-events: none;
+        }
+        .dca-bar-label.outside { right: -8px; transform: translateX(100%); padding-left: 10px; }
+        .dca-bar-label.inside  { right: 14px; color: #0f172a; }
+        .dca-bar-label .mult { font-weight: 500; color: var(--muted); margin-left: 6px; font-size: 0.85em; }
+        .dca-bar-label.inside .mult { color: rgba(15,23,42,0.65); }
+
+        .dca-footnote {
+            color: var(--muted);
+            font-size: 0.84rem;
+            margin-top: 1.5rem;
+            line-height: 1.5;
+        }
+        .dca-loading {
+            text-align: center;
+            padding: 1rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        /* Closing */
+        .saver-closing {
+            text-align: center;
+            padding: 3.5rem 0 1rem;
+        }
+        .saver-closing h3 {
+            font-size: clamp(1.4rem, 3vw, 2rem);
+            margin: 0 0 1rem;
+        }
+        .saver-closing p {
+            color: var(--muted);
+            max-width: 540px;
+            margin: 0 auto 1.5rem;
+        }
+        .saver-closing .cta-row {
+            display: inline-flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .saver-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 18px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+        }
+        .saver-cta:hover { border-color: var(--brand); color: var(--brand); transform: translateY(-2px); }
+        .saver-cta.primary { background: var(--brand); color: #0f172a; border-color: var(--brand); }
+        .saver-cta.primary:hover { color: #0f172a; opacity: 0.92; }
+
+        /* Mobile */
+        @media (max-width: 720px) {
+            .saver-wrap { padding: 0 16px 3rem; }
+            .saver-hero { padding: 3rem 0 2rem; }
+            .dca-summary { grid-template-columns: 1fr; }
+            .dca-bar { grid-template-columns: 80px 1fr; gap: 10px; }
+            .dca-bar-track { height: 32px; }
+            .dca-bar-label.outside { padding-left: 6px; font-size: 0.85rem; }
+            .priced-card { padding: 18px 16px 16px; }
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/_header.html' %}
+
+    <article class="saver-wrap">
+        <header class="saver-hero">
+            <div class="eyebrow">The Saver's view</div>
+            <h1>Bitcoin, priced in real things.</h1>
+            <p class="lede">
+                Forget the dollar chart for a moment. The honest question is: how many loaves of bread, pints of milk,
+                houses, or salaries does one Bitcoin actually buy today — and what would a small monthly habit have grown into?
+            </p>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hs-label">Spot · 1 Bitcoin</div>
+                    <div class="hs-value" id="heroSpot">—</div>
+                    <div class="hs-sub" id="heroSpotSub">live, GBP</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hs-label">Your £1, in sats</div>
+                    <div class="hs-value" id="heroSats">—</div>
+                    <div class="hs-sub">satoshis per pound</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hs-label">UK average house</div>
+                    <div class="hs-value" id="heroHouses">—</div>
+                    <div class="hs-sub">houses per BTC</div>
+                </div>
+            </div>
+        </header>
+
+        <section class="saver-section">
+            <h2>What does Bitcoin actually cost?</h2>
+            <p class="section-blurb">
+                Numbers in pounds drift. Inflation eats them, exchange rates shake them. Real goods are steadier yardsticks.
+                Each card below says the same thing two ways: how many of the thing one Bitcoin will buy, and how many
+                <em>satoshis</em> (hundred-millionths of a BTC) the thing costs.
+            </p>
+            <div class="priced-grid" id="pricedGrid"></div>
+        </section>
+
+        <section class="saver-section">
+            <h2>If you'd put a little aside every month…</h2>
+            <p class="section-blurb">
+                The most boring strategy works. Adjust the monthly amount and the start month — we'll show what that
+                same habit would be worth today, alongside putting it in a UK savings account or buying the FTSE 100.
+                All figures in pounds, contributions on the first of each month.
+            </p>
+
+            <div class="dca-wrap">
+                <div class="dca-controls">
+                    <div class="dca-control">
+                        <label for="dcaMonthly">£ per month</label>
+                        <input id="dcaMonthly" type="number" value="100" min="1" max="100000" step="5" inputmode="numeric">
+                    </div>
+                    <div class="dca-control">
+                        <label for="dcaStart">Starting</label>
+                        <input id="dcaStart" type="month" value="2018-01" min="2013-01">
+                    </div>
+                    <div class="dca-control">
+                        <label for="dcaCashRate">Cash savings rate (%)</label>
+                        <input id="dcaCashRate" type="number" value="3" min="0" max="20" step="0.5" inputmode="decimal">
+                    </div>
+                </div>
+
+                <div class="dca-summary">
+                    <div class="dca-summary-card">
+                        <div class="dsc-label">You'd have invested</div>
+                        <div class="dsc-value" id="dcaInvested">£—</div>
+                        <div class="dsc-sub" id="dcaMonths">— monthly buys</div>
+                    </div>
+                    <div class="dca-summary-card">
+                        <div class="dsc-label">Today's Bitcoin value</div>
+                        <div class="dsc-value" id="dcaBtcValue" style="color: var(--brand);">£—</div>
+                        <div class="dsc-sub" id="dcaBtcAccum">— BTC accumulated</div>
+                    </div>
+                </div>
+
+                <div class="dca-bars" id="dcaBars" aria-live="polite">
+                    <div class="dca-bar">
+                        <div class="dca-bar-key btc"><span class="swatch"></span>Bitcoin</div>
+                        <div class="dca-bar-track">
+                            <div class="dca-bar-fill btc" data-key="btc" style="width: 0;"></div>
+                            <div class="dca-bar-label outside" data-label="btc">£—</div>
+                        </div>
+                    </div>
+                    <div class="dca-bar">
+                        <div class="dca-bar-key ftse"><span class="swatch"></span>FTSE 100</div>
+                        <div class="dca-bar-track">
+                            <div class="dca-bar-fill ftse" data-key="ftse" style="width: 0;"></div>
+                            <div class="dca-bar-label outside" data-label="ftse">£—</div>
+                        </div>
+                    </div>
+                    <div class="dca-bar">
+                        <div class="dca-bar-key cash"><span class="swatch"></span>Cash @ <span id="dcaCashRateLbl">3</span>%</div>
+                        <div class="dca-bar-track">
+                            <div class="dca-bar-fill cash" data-key="cash" style="width: 0;"></div>
+                            <div class="dca-bar-label outside" data-label="cash">£—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="dca-footnote" id="dcaFootnote">
+                    Past performance is not a guide to future results. Real-world fees, taxes, and bid/ask spreads
+                    aren't modelled. FTSE 100 returns ignore reinvested dividends. Cash uses simple monthly compounding
+                    on the rate you set.
+                </p>
+            </div>
+        </section>
+
+        <footer class="saver-closing">
+            <h3>Why this matters</h3>
+            <p>
+                A savings technology is only as good as what it buys when you finally spend it. Tracking Bitcoin against
+                real things — a roof, a year of work, an ounce of gold — is how you check whether the protocol is doing
+                its job.
+            </p>
+            <div class="cta-row">
+                <a class="saver-cta primary" href="/bitcoin-for-humans">Read the story →</a>
+                <a class="saver-cta" href="/bitcoin-metrics">Network metrics</a>
+            </div>
+        </footer>
+    </article>
+
+    <script>
+    (function(){
+        const fmtMoney = (v, opts) => v == null ? '—' : '£' + Number(v).toLocaleString('en-GB', Object.assign({maximumFractionDigits: 0}, opts || {}));
+        const fmtInt = v => v == null ? '—' : Number(v).toLocaleString('en-GB', { maximumFractionDigits: 0 });
+        const fmt2 = v => v == null ? '—' : Number(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const fmtMult = v => v == null ? '—' : (v < 10 ? v.toFixed(2) : v.toFixed(1)) + '×';
+
+        // Smart unit formatter for "things per BTC": adapts decimals + commas
+        function fmtUnitsPerBtc(v){
+            if (v == null) return '—';
+            if (v >= 1000)   return Number(v).toLocaleString('en-GB', { maximumFractionDigits: 0 });
+            if (v >= 10)     return Number(v).toLocaleString('en-GB', { maximumFractionDigits: 1 });
+            if (v >= 1)      return Number(v).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+            return Number(v).toLocaleString('en-GB', { maximumFractionDigits: 3 });
+        }
+        function fmtSatsPerUnit(v){
+            if (v == null) return '—';
+            if (v >= 1)      return Number(v).toLocaleString('en-GB', { maximumFractionDigits: 0 }) + ' sats';
+            return v.toFixed(4) + ' BTC';
+        }
+
+        // --- Hero stats + priced-in grid ---
+        async function loadPricedIn(){
+            try {
+                const r = await fetch('/api/priced-in');
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const j = await r.json();
+                document.getElementById('heroSpot').textContent = fmtMoney(j.spot_btc_gbp);
+                document.getElementById('heroSats').textContent = fmtInt(j.sats_per_pound) + ' sats';
+
+                // Find avg UK house entry for hero
+                const refs = j.references || [];
+                const house = refs.find(r => r.key === 'avg_uk_house');
+                if (house) {
+                    const v = house.units_per_btc;
+                    document.getElementById('heroHouses').textContent =
+                        v == null ? '—' :
+                        v >= 1 ? v.toFixed(2) : (1 / v).toFixed(2) + ' BTC';
+                    document.getElementById('heroHouses').nextElementSibling.textContent =
+                        v == null ? '—' :
+                        v >= 1 ? 'houses per BTC' : 'BTC per house';
+                }
+
+                // Build grid
+                const grid = document.getElementById('pricedGrid');
+                grid.innerHTML = '';
+                refs.forEach(ref => {
+                    const upbV = ref.units_per_btc;
+                    const upbStr = fmtUnitsPerBtc(upbV);
+                    const sats = fmtSatsPerUnit(ref.sats_per_unit);
+                    const unitPrice = ref.unit_price_gbp >= 100
+                        ? fmtMoney(ref.unit_price_gbp)
+                        : '£' + Number(ref.unit_price_gbp).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const card = document.createElement('div');
+                    card.className = 'priced-card';
+                    card.innerHTML = `
+                        <div class="pc-label">${ref.label}</div>
+                        <div class="pc-headline">1 BTC buys
+                            <strong>${upbStr}</strong>
+                            ${ref.plural}
+                        </div>
+                        <div class="pc-flip">1 ${ref.label.replace(/\s*\([^)]*\)/, '')} ≈ <strong>${sats}</strong></div>
+                        <div class="pc-as-of">unit price ${unitPrice} · ${ref.as_of} · ${ref.source}</div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch(e) {
+                console.error('priced-in load failed', e);
+            }
+        }
+
+        // --- DCA calculator ---
+        let dcaController = null;
+        let dcaDebounce = null;
+        async function runDca(){
+            const monthly = parseFloat(document.getElementById('dcaMonthly').value) || 100;
+            const start = document.getElementById('dcaStart').value || '2018-01';
+            const cashRate = parseFloat(document.getElementById('dcaCashRate').value) || 0;
+            document.getElementById('dcaCashRateLbl').textContent = cashRate;
+
+            if (dcaController) dcaController.abort();
+            dcaController = new AbortController();
+
+            try {
+                const r = await fetch(`/api/dca?monthly=${monthly}&start=${start}&cash_rate=${cashRate}`, { signal: dcaController.signal });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const j = await r.json();
+
+                document.getElementById('dcaInvested').textContent = fmtMoney(j.invested);
+                document.getElementById('dcaMonths').textContent = `${j.months} monthly buys`;
+
+                document.getElementById('dcaBtcValue').textContent = fmtMoney(j.btc.value_gbp);
+                document.getElementById('dcaBtcAccum').textContent =
+                    j.btc.accumulated != null
+                        ? j.btc.accumulated.toFixed(j.btc.accumulated < 1 ? 6 : 4) + ' BTC accumulated'
+                        : '— BTC accumulated';
+
+                // Bar widths normalized to max
+                const btcV  = j.btc.value_gbp || 0;
+                const ftseV = (j.ftse && j.ftse.value_gbp) || 0;
+                const cashV = (j.cash && j.cash.value_gbp) || 0;
+                const max = Math.max(btcV, ftseV, cashV, j.invested || 1);
+
+                function paint(key, value, mult, available){
+                    const fill = document.querySelector(`.dca-bar-fill[data-key="${key}"]`);
+                    const label = document.querySelector(`.dca-bar-label[data-label="${key}"]`);
+                    if (!fill || !label) return;
+                    if (!available) {
+                        fill.style.width = '0%';
+                        label.textContent = 'data unavailable';
+                        label.classList.remove('inside');
+                        label.classList.add('outside');
+                        return;
+                    }
+                    const pct = max > 0 ? Math.max(2, Math.min(100, (value / max) * 100)) : 0;
+                    fill.style.width = pct + '%';
+                    const text = `${fmtMoney(value)}`;
+                    const multStr = mult != null ? ` <span class="mult">${fmtMult(mult)}</span>` : '';
+                    label.innerHTML = text + multStr;
+                    // Place label inside if bar is wide enough, otherwise outside
+                    if (pct > 35) {
+                        label.classList.add('inside');
+                        label.classList.remove('outside');
+                        label.style.left = (pct - 2) + '%';
+                        label.style.transform = 'translateX(-100%)';
+                        label.style.right = 'auto';
+                    } else {
+                        label.classList.remove('inside');
+                        label.classList.add('outside');
+                        label.style.left = pct + '%';
+                        label.style.transform = '';
+                        label.style.right = 'auto';
+                    }
+                }
+                paint('btc',  btcV,  j.btc.multiplier, true);
+                paint('ftse', ftseV, j.ftse && j.ftse.multiplier, j.ftse && j.ftse.available);
+                paint('cash', cashV, j.cash.multiplier, true);
+            } catch(e) {
+                if (e.name === 'AbortError') return;
+                console.error('DCA fetch failed', e);
+            }
+        }
+        function scheduleDca(){
+            clearTimeout(dcaDebounce);
+            dcaDebounce = setTimeout(runDca, 200);
+        }
+
+        // Set max attribute on the month picker to current month
+        (function clampStartMax(){
+            const el = document.getElementById('dcaStart');
+            const now = new Date();
+            const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}`;
+            el.setAttribute('max', ym);
+        })();
+
+        ['dcaMonthly','dcaStart','dcaCashRate'].forEach(id => {
+            document.getElementById(id).addEventListener('input', scheduleDca);
+            document.getElementById(id).addEventListener('change', scheduleDca);
+        });
+
+        // Initial load
+        loadPricedIn();
+        runDca();
+    })();
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import csv
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -6,9 +6,21 @@ import time
 import json
 import requests
 import math
-from typing import Optional
+from typing import Optional, List, Tuple
 
 app = Flask(__name__)
+
+# UK consumer reference values for /api/priced-in.
+# Hardcoded approximations sourced from public ONS / Land Registry / BBPA data;
+# refresh annually. Each entry includes an as_of label so the UI can show it.
+PRICED_IN_REFERENCES = [
+    {'key': 'milk_pint',     'gbp': 0.85,    'label': 'pint of milk',                  'plural': 'pints of milk',                  'as_of': '2025',     'source': 'ONS retail prices'},
+    {'key': 'bread_loaf',    'gbp': 1.40,    'label': 'loaf of bread',                 'plural': 'loaves of bread',                'as_of': '2025',     'source': 'ONS retail prices'},
+    {'key': 'weekly_shop',   'gbp': 55.0,    'label': 'weekly food shop (1 adult)',    'plural': 'weekly food shops',              'as_of': '2025',     'source': 'ONS LCFS (approx.)'},
+    {'key': 'pint_beer',     'gbp': 5.20,    'label': 'pint of beer (pub)',            'plural': 'pints of beer',                  'as_of': '2025',     'source': 'BBPA (approx.)'},
+    {'key': 'avg_uk_house',  'gbp': 290000,  'label': 'average UK house',              'plural': 'average UK houses',              'as_of': '2025',     'source': 'HM Land Registry HPI'},
+    {'key': 'median_salary', 'gbp': 37500,   'label': 'median UK annual salary',       'plural': 'median UK annual salaries',      'as_of': '2025',     'source': 'ONS ASHE'},
+]
 
 def _read_prices_from_csv(csv_path: Path):
     closes = []
@@ -58,6 +70,10 @@ def bitcoin_metrics():
 @app.route('/bitcoin-for-humans')
 def bitcoin_for_humans():
     return render_template('bitcoin-for-humans.html')
+
+@app.route('/priced-in')
+def priced_in_page():
+    return render_template('priced-in.html')
 
 @app.route('/api/nodes-latest')
 def nodes_latest():
@@ -683,25 +699,36 @@ def sparkline(key):
 
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):
-    """Historical BTC/GBP prices, sourced from CoinGecko market_chart.
-    The local CSV is kept as a deep-history fallback for 'ALL' only."""
+    """Historical BTC/GBP prices for the price page chart.
+
+    Short ranges (1M/3M/6M/1Y): CoinGecko market_chart in GBP.
+    ALL: merged CSV + recent CoinGecko via _load_btc_history_gbp, because
+    CoinGecko's free API caps `days=max` for non-Pro users.
+    """
     range_to_days = {
         '1M': '30',
         '3M': '90',
         '6M': '180',
         '1Y': '365',
-        'ALL': 'max',
     }
+    cache_dir = Path(__file__).parent / 'data'
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    if range == 'ALL':
+        try:
+            hist = _load_btc_history_gbp(cache_dir)
+            if not hist:
+                return jsonify({'error': 'history unavailable'}), 502
+            prices = [[int(time.mktime(d.timetuple()) * 1000), p] for d, p in hist]
+            return jsonify({'prices': prices, 'source': 'csv+coingecko'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 502
+
     days = range_to_days.get(range)
     if days is None:
         return jsonify({'error': f'Invalid range: {range}'}), 400
 
-    cache_dir = Path(__file__).parent / 'data'
-    cache_dir.mkdir(parents=True, exist_ok=True)
     cache_file = cache_dir / f'historical_{range}.json'
-    now = datetime.utcnow()
-
-    # 15 min cache for short ranges, 6h for 1Y/ALL (less volatile, slower-changing endpoint)
     ttl = timedelta(minutes=15) if range in ('1M', '3M', '6M') else timedelta(hours=6)
     cached = _cached_json(cache_file, ttl)
     if cached and 'prices' in cached:
@@ -710,15 +737,13 @@ def get_historical_data(range):
     try:
         r = requests.get(
             'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart',
-            params={'vs_currency': 'gbp', 'days': days, 'interval': 'daily' if days != 'max' else None},
+            params={'vs_currency': 'gbp', 'days': days, 'interval': 'daily'},
             timeout=20,
         )
         r.raise_for_status()
         j = r.json()
-        raw = j.get('prices', [])
-        # Normalize to [[ms, price], ...]
         prices = []
-        for pt in raw:
+        for pt in j.get('prices', []):
             if isinstance(pt, list) and len(pt) >= 2:
                 try:
                     prices.append([int(pt[0]), float(pt[1])])
@@ -739,25 +764,322 @@ def get_historical_data(range):
                     return jsonify(data)
             except Exception:
                 pass
-        # Last-resort CSV fallback for ALL
-        if range == 'ALL':
-            csv_path = cache_dir / 'bitcoin_historical.csv'
-            if csv_path.exists():
-                prices = []
-                try:
-                    with open(csv_path, 'r') as f:
-                        reader = csv.DictReader(f)
-                        for row in reader:
-                            try:
-                                d = datetime.strptime(row['Date'], '%Y-%m-%d')
-                                prices.append([int(time.mktime(d.timetuple()) * 1000), float(row['Close'])])
-                            except Exception:
-                                continue
-                    if prices:
-                        return jsonify({'prices': prices, 'source': 'csv-fallback'})
-                except Exception:
-                    pass
         return jsonify({'error': str(e)}), 502
+
+# --------------------------------------------------------------------------- #
+# Saver's view — /priced-in
+# --------------------------------------------------------------------------- #
+
+def _get_gold_oz_gbp(cache_dir: Path, gbp_per_usd: float) -> Optional[float]:
+    """Latest gold price per troy ounce in GBP, derived from Yahoo GC=F * GBP/USD."""
+    cache_file = cache_dir / 'gold_oz_gbp_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=1))
+    if cached and 'gbp' in cached:
+        try:
+            return float(cached['gbp'])
+        except Exception:
+            pass
+    try:
+        r = requests.get(
+            'https://query2.finance.yahoo.com/v8/finance/chart/GC=F',
+            params={'range': '2d', 'interval': '1d'},
+            timeout=15,
+            headers={'User-Agent': 'Mozilla/5.0'},
+        )
+        if not r.ok:
+            return None
+        j = r.json()
+        result = (j.get('chart') or {}).get('result') or []
+        if not result:
+            return None
+        meta = result[0].get('meta') or {}
+        usd = meta.get('regularMarketPrice')
+        if usd is None:
+            return None
+        gbp = float(usd) * (gbp_per_usd or 0.78)
+        _write_cache(cache_file, {'gbp': gbp})
+        return gbp
+    except Exception:
+        return None
+
+def _load_btc_history_gbp(cache_dir: Path) -> List[Tuple[datetime, float]]:
+    """Daily BTC/GBP history back to 2014.
+
+    Source: stitches the local bitcoin_historical.csv (GBP daily, 2014→2025)
+    with a CoinGecko days=365 fetch for the recent gap. CoinGecko's free API
+    caps history at 365 days, so we can't ask for `max` directly.
+    Cached 24h.
+    """
+    cache_file = cache_dir / 'btc_history_gbp_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=24))
+    if cached and 'prices' in cached:
+        out: List[Tuple[datetime, float]] = []
+        for d, p in cached['prices']:
+            try:
+                out.append((datetime.fromisoformat(d), float(p)))
+            except Exception:
+                continue
+        if out:
+            return out
+
+    # 1) CSV foundation
+    csv_path = cache_dir / 'bitcoin_historical.csv'
+    by_date: dict = {}
+    if csv_path.exists():
+        try:
+            with open(csv_path, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    try:
+                        d = datetime.strptime(row['Date'], '%Y-%m-%d')
+                        by_date[d] = float(row['Close'])
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+    # 2) Recent year from CoinGecko (overwrites any overlap with the CSV)
+    try:
+        r = requests.get(
+            'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart',
+            params={'vs_currency': 'gbp', 'days': '365', 'interval': 'daily'},
+            timeout=30,
+        )
+        if r.ok:
+            j = r.json()
+            for pt in j.get('prices', []):
+                try:
+                    ts_ms = int(pt[0])
+                    val = float(pt[1])
+                    # Normalize to midnight UTC so it merges cleanly with CSV daily dates
+                    d = datetime.utcfromtimestamp(ts_ms / 1000).replace(hour=0, minute=0, second=0, microsecond=0)
+                    by_date[d] = val
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    result = sorted(by_date.items())
+    if result:
+        _write_cache(cache_file, {'prices': [[d.isoformat(), p] for d, p in result]})
+    return result
+
+def _load_ftse_monthly_gbp(cache_dir: Path) -> List[Tuple[datetime, float]]:
+    """Monthly FTSE 100 closes from Yahoo Finance (^FTSE). Cached 24h.
+
+    Yahoo's v8 chart endpoint caps `range=10y` at monthly resolution, which
+    is enough for the DCA calculator. For start dates earlier than ~10 years
+    ago, BTC contributions before Yahoo's window simply won't have a FTSE
+    counterpart; the DCA endpoint already treats that gracefully.
+    """
+    cache_file = cache_dir / 'ftse_monthly_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=24))
+    if cached and 'prices' in cached:
+        out: List[Tuple[datetime, float]] = []
+        for d, p in cached['prices']:
+            try:
+                out.append((datetime.fromisoformat(d), float(p)))
+            except Exception:
+                continue
+        if out:
+            return out
+    try:
+        r = requests.get(
+            'https://query2.finance.yahoo.com/v8/finance/chart/%5EFTSE',
+            params={'range': '10y', 'interval': '1mo'},
+            timeout=30,
+            headers={'User-Agent': 'Mozilla/5.0'},
+        )
+        if not r.ok:
+            return []
+        j = r.json()
+        result_arr = (j.get('chart') or {}).get('result') or []
+        if not result_arr:
+            return []
+        chart = result_arr[0]
+        timestamps = chart.get('timestamp') or []
+        quote = ((chart.get('indicators') or {}).get('quote') or [{}])[0]
+        closes = quote.get('close') or []
+        result: List[Tuple[datetime, float]] = []
+        for ts, close in zip(timestamps, closes):
+            if ts is None or close is None:
+                continue
+            try:
+                d = datetime.utcfromtimestamp(int(ts)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                result.append((d, float(close)))
+            except Exception:
+                continue
+        if result:
+            _write_cache(cache_file, {'prices': [[d.isoformat(), p] for d, p in result]})
+        return result
+    except Exception:
+        return []
+
+def _series_value_at_or_before(series: List[Tuple[datetime, float]], when: datetime) -> Optional[float]:
+    """Binary search the latest value <= when. Series must be sorted ascending."""
+    if not series:
+        return None
+    lo, hi = 0, len(series) - 1
+    if when < series[0][0]:
+        return None
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if series[mid][0] <= when:
+            lo = mid
+        else:
+            hi = mid - 1
+    return series[lo][1]
+
+@app.route('/api/priced-in')
+def api_priced_in():
+    """Snapshot of BTC priced in everyday UK reference goods + sats-per-£."""
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / 'priced_in_cache.json'
+        cached = _cached_json(cache_file, timedelta(minutes=10))
+        if cached:
+            return jsonify(cached)
+
+        spot = _get_spot_price_gbp_cached(cache_dir)
+        fx = _get_gbp_per_usd(cache_dir) or 0.78
+        gold_gbp = _get_gold_oz_gbp(cache_dir, fx)
+
+        references = []
+        for ref in PRICED_IN_REFERENCES:
+            gbp = ref['gbp']
+            references.append({
+                'key': ref['key'],
+                'label': ref['label'],
+                'plural': ref['plural'],
+                'unit_price_gbp': gbp,
+                'units_per_btc': (spot / gbp) if (spot and gbp) else None,
+                'sats_per_unit': (gbp / spot * 100_000_000) if spot else None,
+                'as_of': ref['as_of'],
+                'source': ref['source'],
+            })
+        if gold_gbp:
+            references.append({
+                'key': 'gold_oz',
+                'label': 'ounce of gold',
+                'plural': 'ounces of gold',
+                'unit_price_gbp': round(gold_gbp, 2),
+                'units_per_btc': (spot / gold_gbp) if (spot and gold_gbp) else None,
+                'sats_per_unit': (gold_gbp / spot * 100_000_000) if spot else None,
+                'as_of': 'live',
+                'source': 'stooq XAUUSD × GBP/USD',
+            })
+
+        payload = {
+            'spot_btc_gbp': round(spot, 2) if spot else None,
+            'sats_per_pound': round(100_000_000 / spot, 0) if spot else None,
+            'gbp_per_usd': round(fx, 4),
+            'references': references,
+        }
+        _write_cache(cache_file, payload)
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dca')
+def api_dca():
+    """Compute a Bitcoin DCA simulation and compare with cash + FTSE 100.
+
+    Query params:
+        monthly     £ contributed each month (default 100)
+        start       YYYY-MM start of contributions (default 2018-01)
+        cash_rate   Annual cash savings rate as %, default 3
+    """
+    try:
+        monthly = float(request.args.get('monthly', 100))
+        start_str = request.args.get('start', '2018-01')
+        cash_rate_pct = float(request.args.get('cash_rate', 3.0))
+        if monthly <= 0 or monthly > 1_000_000:
+            return jsonify({'error': 'monthly out of range'}), 400
+        try:
+            start_dt = datetime.strptime(start_str, '%Y-%m')
+        except ValueError:
+            return jsonify({'error': 'start must be YYYY-MM'}), 400
+        if start_dt < datetime(2013, 1, 1):
+            start_dt = datetime(2013, 1, 1)  # CoinGecko coverage limit
+        cash_rate = cash_rate_pct / 100.0
+
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        btc_hist = _load_btc_history_gbp(cache_dir)
+        ftse_hist = _load_ftse_monthly_gbp(cache_dir)
+
+        if not btc_hist:
+            return jsonify({'error': 'BTC history unavailable'}), 502
+
+        # Generate monthly contribution dates from start to now (inclusive)
+        end_dt = datetime.utcnow().replace(day=1)
+        months: List[datetime] = []
+        cursor = start_dt.replace(day=1)
+        while cursor <= end_dt:
+            months.append(cursor)
+            if cursor.month == 12:
+                cursor = cursor.replace(year=cursor.year + 1, month=1)
+            else:
+                cursor = cursor.replace(month=cursor.month + 1)
+
+        btc_accum = 0.0
+        ftse_shares = 0.0
+        invested = 0.0
+        btc_invested = 0.0
+        ftse_invested = 0.0
+        for m in months:
+            invested += monthly
+            p_btc = _series_value_at_or_before(btc_hist, m)
+            if p_btc:
+                btc_accum += monthly / p_btc
+                btc_invested += monthly
+            p_ftse = _series_value_at_or_before(ftse_hist, m)
+            if p_ftse:
+                ftse_shares += monthly / p_ftse
+                ftse_invested += monthly
+
+        # Latest values
+        spot_btc = btc_hist[-1][1] if btc_hist else None
+        spot_ftse = ftse_hist[-1][1] if ftse_hist else None
+
+        btc_value = btc_accum * spot_btc if spot_btc else 0
+        ftse_value = ftse_shares * spot_ftse if spot_ftse else 0
+
+        # Cash: monthly compounding, contribution at end of month
+        m_rate = cash_rate / 12.0
+        cash_value = 0.0
+        for _ in months:
+            cash_value = cash_value * (1 + m_rate) + monthly
+
+        payload = {
+            'monthly': monthly,
+            'start': start_dt.strftime('%Y-%m'),
+            'months': len(months),
+            'invested': round(invested, 2),
+            'btc': {
+                'accumulated': round(btc_accum, 8),
+                'value_gbp': round(btc_value, 2),
+                'multiplier': round(btc_value / invested, 2) if invested else None,
+            },
+            'cash': {
+                'rate_pct': cash_rate_pct,
+                'value_gbp': round(cash_value, 2),
+                'multiplier': round(cash_value / invested, 2) if invested else None,
+            },
+            'ftse': {
+                'value_gbp': round(ftse_value, 2) if spot_ftse else None,
+                'multiplier': round(ftse_value / invested, 2) if invested and spot_ftse else None,
+                'available': spot_ftse is not None,
+            },
+            'as_of_btc': btc_hist[-1][0].isoformat() if btc_hist else None,
+            'as_of_ftse': ftse_hist[-1][0].isoformat() if ftse_hist else None,
+            'spot_btc_gbp': round(spot_btc, 2) if spot_btc else None,
+        }
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(threaded=True)
