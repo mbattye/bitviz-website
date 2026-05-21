@@ -236,6 +236,47 @@ def _get_gbp_per_usd(cache_dir: Path) -> Optional[float]:
     except Exception:
         return None
 
+@app.route('/api/tip')
+def tip_height():
+    """Lightweight endpoint for the header block-height pill. Cached 30s."""
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / 'tip_height_cache.json'
+        now = datetime.utcnow()
+        # Reuse the existing tip_height_cache with a tighter staleness window
+        if cache_file.exists():
+            try:
+                cached = json.loads(cache_file.read_text())
+                ts = datetime.fromisoformat(cached.get('fetched_at'))
+                if (now - ts) < timedelta(seconds=30):
+                    data = cached.get('data') or {}
+                    h = data.get('height') if isinstance(data, dict) else None
+                    if isinstance(h, int):
+                        return jsonify({'height': h})
+            except Exception:
+                pass
+        try:
+            r = requests.get('https://mempool.space/api/blocks/tip/height', timeout=10)
+            r.raise_for_status()
+            height = int(r.text.strip())
+            cache_file.write_text(json.dumps({'fetched_at': now.isoformat(), 'data': {'height': height}}))
+            return jsonify({'height': height})
+        except Exception:
+            # Stale fallback
+            if cache_file.exists():
+                try:
+                    cached = json.loads(cache_file.read_text())
+                    data = cached.get('data') or {}
+                    h = data.get('height') if isinstance(data, dict) else None
+                    if isinstance(h, int):
+                        return jsonify({'height': h})
+                except Exception:
+                    pass
+            return jsonify({'height': None}), 200
+    except Exception:
+        return jsonify({'height': None}), 200
+
 @app.route('/api/onchain-supply')
 def onchain_supply():
     try:
@@ -563,6 +604,78 @@ def adoption_usage():
         return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def _downsample(values, max_points=60):
+    if not values or len(values) <= max_points:
+        return values
+    step = max(1, len(values) // max_points)
+    out = [values[i] for i in range(0, len(values), step)]
+    if out and out[-1] is not values[-1]:
+        out.append(values[-1])
+    return out
+
+@app.route('/api/sparkline/<key>')
+def sparkline(key):
+    """Return a small array of y-values for a given sparkline key.
+    Keys: price, hashrate, active-addresses, transactions, fx-gbpusd."""
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / f'sparkline_{key}.json'
+        now = datetime.utcnow()
+        cached = _cached_json(cache_file, timedelta(minutes=15))
+        if cached and 'values' in cached:
+            return jsonify(cached)
+
+        values = None
+        if key == 'price':
+            # CoinGecko market_chart for 30d, USD
+            r = requests.get(
+                'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart',
+                params={'vs_currency':'usd','days':'30','interval':'daily'},
+                timeout=20,
+            )
+            r.raise_for_status()
+            j = r.json()
+            prices = j.get('prices', [])
+            values = [float(p[1]) for p in prices if isinstance(p, list) and len(p) >= 2]
+        elif key in ('hashrate', 'active-addresses', 'transactions'):
+            chart_map = {
+                'hashrate': 'hash-rate',
+                'active-addresses': 'n-unique-addresses',
+                'transactions': 'n-transactions',
+            }
+            data = _bc_chart(chart_map[key], '30days', cache_dir, 15)
+            vals = (data or {}).get('values', [])
+            values = [float(pt['y']) for pt in vals if 'y' in pt]
+        elif key == 'fx-gbpusd':
+            end = now.date()
+            start = end - timedelta(days=30)
+            url = f'https://api.frankfurter.app/{start.isoformat()}..{end.isoformat()}'
+            r = requests.get(url, params={'from':'USD','to':'GBP'}, timeout=15)
+            r.raise_for_status()
+            rates = (r.json() or {}).get('rates', {})
+            keys_sorted = sorted(rates.keys())
+            values = [float(rates[d]['GBP']) for d in keys_sorted]
+        else:
+            return jsonify({'error': f'unknown sparkline key: {key}'}), 404
+
+        values = _downsample(values, 60) if values else []
+        payload = {'values': values}
+        _write_cache(cache_file, payload)
+        return jsonify(payload)
+    except Exception as e:
+        # Try stale cache
+        try:
+            cache_file = Path(__file__).parent / 'data' / f'sparkline_{key}.json'
+            if cache_file.exists():
+                cached = json.loads(cache_file.read_text())
+                d = cached.get('data') or {}
+                if 'values' in d:
+                    return jsonify(d)
+        except Exception:
+            pass
+        return jsonify({'values': [], 'error': str(e)}), 200
 
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):

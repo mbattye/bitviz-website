@@ -1,0 +1,499 @@
+{# Shared BitViz header partial.
+   Owns: theme variables, theme toggle, currency switcher, live tip-height pill, nav.
+   Pages: include {% include 'partials/_header.html' %} at the start of <body>. #}
+
+<style>
+    :root {
+        --bg: #0f172a;
+        --bg-soft: #111c33;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --brand: #f7931a;
+        --panel: #1e293b;
+        --panel-contrast: #0f172a;
+        --positive: #4ade80;
+        --negative: #f87171;
+        --grid: rgba(148, 163, 184, 0.1);
+        --border: rgba(148, 163, 184, 0.18);
+        --tooltip-bg: #334155;
+        --tooltip-text: #e2e8f0;
+        --map-fill: #1e293b;
+        --map-stroke: #94a3b8;
+    }
+    :root[data-theme="light"] {
+        --bg: #f8fafc;
+        --bg-soft: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --accent: #0ea5e9;
+        --brand: #f7931a;
+        --panel: #ffffff;
+        --panel-contrast: #ffffff;
+        --positive: #16a34a;
+        --negative: #dc2626;
+        --grid: rgba(100,116,139,0.15);
+        --border: rgba(15,23,42,0.10);
+        --tooltip-bg: #ffffff;
+        --tooltip-text: #0f172a;
+        --map-fill: #e2e8f0;
+        --map-stroke: #94a3b8;
+    }
+
+    /* Header */
+    .bv-header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: color-mix(in srgb, var(--bg) 85%, transparent);
+        backdrop-filter: saturate(140%) blur(12px);
+        -webkit-backdrop-filter: saturate(140%) blur(12px);
+        border-bottom: 1px solid var(--border);
+    }
+    .bv-header-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 12px 20px;
+    }
+    .bv-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        color: var(--text);
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    .bv-brand-mark {
+        width: 28px; height: 28px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--brand), #ffb24d);
+        display: grid; place-items: center;
+        color: #0f172a; font-weight: 800; font-size: 14px;
+        box-shadow: 0 4px 14px -4px rgba(247,147,26,0.55);
+    }
+    .bv-brand-text { font-size: 1.05rem; }
+    .bv-nav {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: 6px;
+    }
+    .bv-nav-link {
+        color: var(--muted);
+        text-decoration: none;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 0.92rem;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .bv-nav-link:hover { color: var(--text); background: var(--panel); }
+    .bv-nav-link.active { color: var(--brand); }
+    .bv-nav-link-soon::after {
+        content: 'soon';
+        margin-left: 6px;
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: var(--panel);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        vertical-align: 1px;
+    }
+    .bv-header-actions {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .bv-tip-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        font-size: 0.82rem;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        transition: border-color 0.4s ease, color 0.4s ease;
+    }
+    .bv-tip-pill .bv-tip-label { color: var(--muted); }
+    .bv-tip-pill .bv-tip-value { color: var(--text); font-weight: 600; }
+    .bv-tip-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--brand);
+        box-shadow: 0 0 0 0 rgba(247,147,26,0.6);
+    }
+    .bv-tip-pill.flash { border-color: var(--brand); color: var(--text); }
+    .bv-tip-pill.flash .bv-tip-dot { animation: bv-tip-pulse 1.2s ease-out; }
+    @keyframes bv-tip-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(247,147,26,0.7); }
+        100% { box-shadow: 0 0 0 12px rgba(247,147,26,0); }
+    }
+    .bv-ico-btn {
+        height: 32px;
+        min-width: 32px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+    .bv-ico-btn:hover { border-color: var(--brand); color: var(--brand); }
+    .bv-ico-btn svg { width: 16px; height: 16px; }
+    .bv-ico-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+    /* Info icon + popover (used by metric tiles, stat cards, etc.) */
+    .bv-info-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 1px solid var(--muted);
+        color: var(--muted);
+        background: transparent;
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1;
+        cursor: help;
+        flex: 0 0 auto;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .bv-info-icon:hover, .bv-info-icon:focus-visible {
+        color: var(--brand);
+        border-color: var(--brand);
+        outline: none;
+    }
+    .bv-popover {
+        position: fixed;
+        z-index: 1000;
+        max-width: 300px;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        box-shadow: 0 12px 32px -8px rgba(0,0,0,0.45);
+        font-size: 0.85rem;
+        line-height: 1.45;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s ease;
+    }
+    .bv-popover.show { opacity: 1; pointer-events: auto; }
+    .bv-popover .bv-pop-title { font-weight: 700; color: var(--text); margin-bottom: 4px; font-size: 0.92rem; }
+    .bv-popover .bv-pop-desc { color: var(--muted); margin-bottom: 8px; }
+    .bv-popover .bv-pop-band { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; margin-top: 4px; }
+    .bv-popover .bv-pop-band .bv-band-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+
+    /* Tile sparkline */
+    .bv-sparkline {
+        width: 100%;
+        height: 28px;
+        margin-top: 8px;
+        pointer-events: none;
+    }
+    .bv-sparkline svg { display: block; width: 100%; height: 100%; }
+
+    /* Mobile */
+    @media (max-width: 720px) {
+        .bv-header-inner { gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
+        .bv-brand-text { display: none; }
+        .bv-tip-pill .bv-tip-label { display: none; }
+        .bv-nav-link-soon::after { display: none; }
+        .bv-nav { gap: 0; flex-wrap: wrap; }
+        .bv-nav-link { padding: 6px 8px; font-size: 0.85rem; }
+    }
+    @media (max-width: 480px) {
+        .bv-header-actions { gap: 6px; }
+        .bv-ico-btn { padding: 0 8px; font-size: 0.78rem; }
+    }
+</style>
+
+<header class="bv-header">
+    <div class="bv-header-inner">
+        <a href="/" class="bv-brand" aria-label="BitViz home">
+            <span class="bv-brand-mark">₿</span>
+            <span class="bv-brand-text">BitViz</span>
+        </a>
+        <nav class="bv-nav" aria-label="Primary">
+            <a href="/" class="bv-nav-link" data-nav="home">Home</a>
+            <a href="/bitcoin-price" class="bv-nav-link" data-nav="price">Price</a>
+            <a href="/bitcoin-metrics" class="bv-nav-link" data-nav="metrics">Metrics</a>
+            <a href="#" class="bv-nav-link bv-nav-link-soon" data-nav="story" aria-disabled="true">Story</a>
+        </nav>
+        <div class="bv-header-actions">
+            <div class="bv-tip-pill" id="bvTipPill" title="Current Bitcoin block height — polls every 30s">
+                <span class="bv-tip-dot" aria-hidden="true"></span>
+                <span class="bv-tip-label">Block</span>
+                <span class="bv-tip-value" id="bvTipHeight">—</span>
+            </div>
+            <button id="bvFxToggle" class="bv-ico-btn" aria-label="Toggle currency between GBP and USD" title="Toggle currency">
+                <span id="bvFxLabel">GBP</span>
+            </button>
+            <button id="bvThemeToggle" class="bv-ico-btn" aria-label="Toggle color theme" title="Toggle theme">
+                <svg id="bvIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+                <svg id="bvIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+</header>
+
+<script>
+(function(){
+    // Global BV namespace shared by all pages
+    window.BV = window.BV || {};
+    const BV = window.BV;
+
+    // --- Currency state ---
+    BV.fx = BV.fx || {
+        mode: localStorage.getItem('bv-currency') || 'GBP',
+        gbp_per_usd: 0.78
+    };
+    BV.setCurrency = function(mode){
+        BV.fx.mode = mode === 'USD' ? 'USD' : 'GBP';
+        localStorage.setItem('bv-currency', BV.fx.mode);
+        const lbl = document.getElementById('bvFxLabel');
+        if (lbl) lbl.textContent = BV.fx.mode;
+        window.dispatchEvent(new CustomEvent('bv:currency-change', { detail: { mode: BV.fx.mode } }));
+    };
+    BV.fetchFx = async function(){
+        try {
+            const r = await fetch('/api/fx-rate');
+            if (r.ok) {
+                const j = await r.json();
+                if (j && j.gbp_per_usd) BV.fx.gbp_per_usd = j.gbp_per_usd;
+            }
+        } catch(_){}
+        return BV.fx.gbp_per_usd;
+    };
+    BV.toUsd = function(gbp){ return gbp == null ? null : (gbp / BV.fx.gbp_per_usd); };
+    BV.toGbp = function(usd){ return usd == null ? null : (usd * BV.fx.gbp_per_usd); };
+    BV.symbol = function(){ return BV.fx.mode === 'GBP' ? '£' : '$'; };
+    BV.formatMoney = function(value, opts){
+        if (value == null) return '—';
+        const o = Object.assign({ maximumFractionDigits: 0 }, opts || {});
+        const locale = BV.fx.mode === 'GBP' ? 'en-GB' : 'en-US';
+        return BV.symbol() + value.toLocaleString(locale, o);
+    };
+    BV.formatNumber = function(value, opts){
+        if (value == null) return '—';
+        const locale = BV.fx.mode === 'GBP' ? 'en-GB' : 'en-US';
+        return value.toLocaleString(locale, opts || {});
+    };
+
+    // --- Theme state ---
+    BV.setTheme = function(theme){
+        const next = theme === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        const sun = document.getElementById('bvIconSun');
+        const moon = document.getElementById('bvIconMoon');
+        if (sun && moon) {
+            const isLight = next === 'light';
+            sun.style.display = isLight ? 'none' : '';
+            moon.style.display = isLight ? '' : 'none';
+        }
+        window.dispatchEvent(new CustomEvent('bv:theme-change', { detail: { theme: next } }));
+    };
+
+    function initTheme(){
+        const saved = localStorage.getItem('theme');
+        const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        const initial = saved || (prefersLight ? 'light' : 'dark');
+        BV.setTheme(initial);
+    }
+
+    // --- Init wiring ---
+    function init(){
+        initTheme();
+
+        // Currency button label
+        const fxLabel = document.getElementById('bvFxLabel');
+        if (fxLabel) fxLabel.textContent = BV.fx.mode;
+
+        // Theme toggle
+        const themeBtn = document.getElementById('bvThemeToggle');
+        if (themeBtn) themeBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            BV.setTheme(current === 'light' ? 'dark' : 'light');
+        });
+
+        // Currency toggle
+        const fxBtn = document.getElementById('bvFxToggle');
+        if (fxBtn) fxBtn.addEventListener('click', () => {
+            BV.setCurrency(BV.fx.mode === 'GBP' ? 'USD' : 'GBP');
+        });
+
+        // Highlight active nav
+        const path = window.location.pathname;
+        document.querySelectorAll('.bv-nav-link').forEach(a => {
+            const href = a.getAttribute('href');
+            if (!href || href === '#') return;
+            if (path === href || (href === '/' && path === '/')) a.classList.add('active');
+        });
+
+        // Kick off shared async work
+        BV.fetchFx();
+        startTipPolling();
+    }
+
+    // --- Tooltip / popover ---
+    let popoverEl = null;
+    function ensurePopover(){
+        if (popoverEl) return popoverEl;
+        popoverEl = document.createElement('div');
+        popoverEl.className = 'bv-popover';
+        popoverEl.setAttribute('role', 'tooltip');
+        document.body.appendChild(popoverEl);
+        return popoverEl;
+    }
+    function positionPopover(anchorRect){
+        const pop = ensurePopover();
+        const margin = 8;
+        const popRect = pop.getBoundingClientRect();
+        let left = anchorRect.left + (anchorRect.width / 2) - (popRect.width / 2);
+        let top = anchorRect.bottom + margin;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        if (left + popRect.width > vw - 8) left = vw - popRect.width - 8;
+        if (left < 8) left = 8;
+        if (top + popRect.height > vh - 8) top = anchorRect.top - popRect.height - margin;
+        pop.style.left = left + 'px';
+        pop.style.top = Math.max(8, top) + 'px';
+    }
+    BV.showPopover = function(anchorEl, html){
+        const pop = ensurePopover();
+        pop.innerHTML = html;
+        pop.style.left = '-9999px';
+        pop.style.top = '0';
+        pop.classList.add('show');
+        // force layout then position
+        requestAnimationFrame(() => positionPopover(anchorEl.getBoundingClientRect()));
+    };
+    BV.hidePopover = function(){
+        if (popoverEl) popoverEl.classList.remove('show');
+    };
+    BV.attachInfo = function(anchorEl, payload){
+        // payload = { title, desc, bands: [{ label, colour }] }
+        function buildHtml(){
+            let bandsHtml = '';
+            if (payload.bands && payload.bands.length) {
+                bandsHtml = payload.bands.map(b =>
+                    `<div class="bv-pop-band"><span class="bv-band-dot" style="background:${b.colour}"></span>${b.label}</div>`
+                ).join('');
+            }
+            return `<div class="bv-pop-title">${payload.title}</div>
+                    <div class="bv-pop-desc">${payload.desc}</div>${bandsHtml}`;
+        }
+        anchorEl.addEventListener('mouseenter', () => BV.showPopover(anchorEl, buildHtml()));
+        anchorEl.addEventListener('mouseleave', () => BV.hidePopover());
+        anchorEl.addEventListener('focus', () => BV.showPopover(anchorEl, buildHtml()));
+        anchorEl.addEventListener('blur', () => BV.hidePopover());
+        anchorEl.addEventListener('click', (e) => {
+            e.preventDefault();
+            const pop = ensurePopover();
+            if (pop.classList.contains('show')) BV.hidePopover();
+            else BV.showPopover(anchorEl, buildHtml());
+        });
+    };
+    BV.makeInfoIcon = function(payload){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'bv-info-icon';
+        btn.setAttribute('aria-label', `Info: ${payload.title}`);
+        btn.textContent = 'i';
+        BV.attachInfo(btn, payload);
+        return btn;
+    };
+    window.addEventListener('scroll', () => BV.hidePopover(), true);
+    window.addEventListener('resize', () => BV.hidePopover());
+
+    // --- Sparkline renderer ---
+    BV.renderSparkline = function(container, values, opts){
+        if (!container) return;
+        container.innerHTML = '';
+        if (!values || values.length < 2) return;
+        opts = opts || {};
+        const w = container.clientWidth || 120;
+        const h = container.clientHeight || 28;
+        const pad = 1.5;
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const range = max - min || 1;
+        const stepX = (w - pad * 2) / (values.length - 1);
+        const points = values.map((v, i) => {
+            const x = pad + i * stepX;
+            const y = h - pad - ((v - min) / range) * (h - pad * 2);
+            return `${x.toFixed(2)},${y.toFixed(2)}`;
+        }).join(' ');
+        const isUp = values[values.length - 1] >= values[0];
+        const colour = opts.colour || (isUp ? 'var(--positive)' : 'var(--negative)');
+        const areaPoints = `${pad},${h} ${points} ${w - pad},${h}`;
+        container.innerHTML = `
+            <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+                <polygon points="${areaPoints}" fill="${colour}" opacity="0.12"></polygon>
+                <polyline points="${points}" fill="none" stroke="${colour}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"></polyline>
+            </svg>`;
+    };
+    BV.loadSparkline = async function(container, key, opts){
+        try {
+            const r = await fetch(`/api/sparkline/${key}`);
+            if (!r.ok) return;
+            const j = await r.json();
+            BV.renderSparkline(container, j.values || [], opts);
+        } catch(_) {}
+    };
+
+    // --- Tip height polling ---
+    let lastHeight = null;
+    async function pollTip(){
+        try {
+            const r = await fetch('/api/tip');
+            if (!r.ok) return;
+            const j = await r.json();
+            if (!j || typeof j.height !== 'number') return;
+            const el = document.getElementById('bvTipHeight');
+            const pill = document.getElementById('bvTipPill');
+            if (el) el.textContent = j.height.toLocaleString();
+            if (pill && lastHeight !== null && j.height !== lastHeight) {
+                pill.classList.add('flash');
+                setTimeout(() => pill.classList.remove('flash'), 1400);
+            }
+            lastHeight = j.height;
+            BV.tipHeight = j.height;
+            window.dispatchEvent(new CustomEvent('bv:tip-update', { detail: { height: j.height } }));
+        } catch(_){}
+    }
+    function startTipPolling(){
+        pollTip();
+        setInterval(pollTip, 30000);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>

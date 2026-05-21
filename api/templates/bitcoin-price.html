@@ -5,42 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Price</title>
     <style>
-        /* Step 1: theme variables with current dark defaults */
-        :root {
-            --bg: #0f172a;        /* body background */
-            --text: #e2e8f0;      /* body text */
-            --muted: #94a3b8;     /* secondary text */
-            --accent: #38bdf8;    /* cyan */
-            --brand: #f7931a;     /* bitcoin orange */
-            --panel: #1e293b;     /* panel bg */
-            --panel-contrast: #0f172a; /* text-on-accent bg */
-            --positive: #4ade80;
-            --negative: #f87171;
-            --grid: rgba(148, 163, 184, 0.1);
-        }
-
-        /* Step 3: light theme palette */
-        :root[data-theme="light"] {
-            --bg: #f8fafc;          /* slate-50 */
-            --text: #0f172a;        /* slate-900 */
-            --muted: #475569;       /* slate-600 */
-            --accent: #0ea5e9;      /* sky-500 */
-            --brand: #f7931a;       /* bitcoin orange */
-            --panel: #ffffff;
-            --panel-contrast: #ffffff;
-            --positive: #16a34a;
-            --negative: #dc2626;
-            --grid: rgba(100,116,139,0.15);
-        }
         body {
             background-color: var(--bg);
             color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .price-page-main {
+            flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
         }
 
         .container {
@@ -48,14 +26,16 @@
         }
 
         .price-display {
-            font-size: 3.5rem;
+            font-size: clamp(2.2rem, 9vw, 3.5rem);
             font-weight: 700;
             margin: 1rem 0;
             color: var(--accent);
+            font-variant-numeric: tabular-nums;
+            line-height: 1.1;
         }
 
         .currency {
-            font-size: 1.5rem;
+            font-size: clamp(1.1rem, 3.5vw, 1.5rem);
             color: var(--muted);
             cursor: pointer;
             user-select: none;
@@ -89,46 +69,6 @@
         .title:hover {
             color: var(--brand);
         }
-
-        .home-button {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.3s;
-            line-height: 0;
-        }
-
-        .home-button svg {
-            width: 28px;
-            height: 28px;
-            fill: var(--muted);
-            transition: fill 0.3s;
-        }
-
-        .home-button:hover svg {
-            fill: var(--brand);
-        }
-
-        /* Minimal theme toggle button */
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 36px;
-            height: 36px;
-            border-radius: 9999px;
-            border: 1px solid var(--muted);
-            background: var(--panel);
-            color: var(--muted);
-            display: grid;
-            place-items: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
-        .theme-toggle svg { width: 18px; height: 18px; }
 
         .price-container {
             position: relative;
@@ -213,6 +153,14 @@
             border-top: 1px solid var(--accent);
             box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);
             z-index: 10;
+        }
+
+        @media (max-width: 720px) {
+            .price-container { padding: 0 16px; }
+            .graph-panel { height: 70vh; }
+            .graph-container { padding: 1rem; }
+            #priceChart { height: calc(100% - 80px); }
+            .time-button { padding: 0.35rem 0.7rem; min-width: 44px; margin-right: 0.35rem; font-size: 0.85rem; }
         }
 
         .graph-panel.open {
@@ -365,32 +313,19 @@
     </style>
 </head>
 <body>
-    <a href="/" class="home-button">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 21H5a1 1 0 0 1-1-1v-9H1l10.327-9.388a1 1 0 0 1 1.346 0L23 11h-3v9a1 1 0 0 1-1 1zm-6-2h5v-9.15L12 4.2l-6 5.65V19h5v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3z"/>
-        </svg>
-    </a>
-    <!-- Step 3: Theme toggle control -->
-    <button id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme">
-        <!-- Sun icon (shown in dark), Moon icon (shown in light) -->
-        <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"></circle>
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-        </svg>
-        <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-    </button>
-    <div class="price-container">
-        <div class="title">Bitcoin</div>
-        <div class="price-display">
-            <span id="price">...</span>
-            <span class="currency" id="currency">GBP</span>
-            <span id="priceLoader" class="price-loader" style="display:none"></span>
+    {% include 'partials/_header.html' %}
+    <main class="price-page-main">
+        <div class="price-container">
+            <div class="title">Bitcoin</div>
+            <div class="price-display">
+                <span id="price">...</span>
+                <span class="currency" id="currency">GBP</span>
+                <span id="priceLoader" class="price-loader" style="display:none"></span>
+            </div>
+            <div class="change" id="change">... <span style="color: #94a3b8">24h</span></div>
         </div>
-        <div class="change" id="change">... <span style="color: #94a3b8">24h</span></div>
-    </div>
-    <div id="errorBanner" class="error-banner"></div>
+        <div id="errorBanner" class="error-banner"></div>
+    </main>
 
     <div class="graph-panel">
         <div class="panel-tab">
@@ -424,43 +359,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
-        let currentCurrency = 'gbp';
+        // Currency is now globally controlled by window.BV (partials/_header.html).
+        // The price page mirrors BV.fx.mode into its local `currentCurrency` for
+        // backwards-compat with existing chart/price code below.
+        let currentCurrency = (window.BV && BV.fx.mode === 'USD') ? 'usd' : 'gbp';
         let displayMode = 'btc'; // 'btc' or 'sats'
-
-        // Step 3: Minimal theme init and toggle (no chart bindings yet)
-        (function initTheme() {
-            const root = document.documentElement;
-            const saved = localStorage.getItem('theme');
-            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-            const initial = saved || (prefersLight ? 'light' : 'dark');
-            root.setAttribute('data-theme', initial);
-            const iconSun = document.getElementById('iconSun');
-            const iconMoon = document.getElementById('iconMoon');
-            if (iconSun && iconMoon) {
-                const isLight = initial === 'light';
-                iconSun.style.display = isLight ? 'none' : '';
-                iconMoon.style.display = isLight ? '' : 'none';
-            }
-        })();
-
-        (function wireThemeToggle(){
-            const btn = document.getElementById('themeToggle');
-            if (!btn) return;
-            btn.addEventListener('click', () => {
-                const root = document.documentElement;
-                const current = root.getAttribute('data-theme') || 'dark';
-                const next = current === 'light' ? 'dark' : 'light';
-                root.setAttribute('data-theme', next);
-                localStorage.setItem('theme', next);
-                const iconSun = document.getElementById('iconSun');
-                const iconMoon = document.getElementById('iconMoon');
-                if (iconSun && iconMoon) {
-                    const isLight = next === 'light';
-                    iconSun.style.display = isLight ? 'none' : '';
-                    iconMoon.style.display = isLight ? '' : 'none';
-                }
-            });
-        })();
 
         // Cache for API responses
         const cache = {
@@ -559,20 +462,13 @@
             }
         }
 
-        let timeoutId;
+        // Inline currency label still toggles, but now via the global BV switcher
         document.getElementById('currency').addEventListener('click', () => {
-            const currencyElement = document.getElementById('currency');
-            currencyElement.style.pointerEvents = 'none';
-            
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-                currentCurrency = currentCurrency === 'gbp' ? 'usd' : 'gbp';
-                fetchBitcoinPrice();
-                
-                setTimeout(() => {
-                    currencyElement.style.pointerEvents = 'auto';
-                }, 1000);
-            }, 250);
+            BV.setCurrency(BV.fx.mode === 'GBP' ? 'USD' : 'GBP');
+        });
+        window.addEventListener('bv:currency-change', (e) => {
+            currentCurrency = e.detail.mode === 'USD' ? 'usd' : 'gbp';
+            fetchBitcoinPrice();
         });
 
         // Clear existing event listeners before adding new ones

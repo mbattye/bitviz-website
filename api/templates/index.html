@@ -3,55 +3,329 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BitViz</title>
+    <title>BitViz — Bitcoin for humans</title>
     <style>
         body {
-            background-color: #1a1a1a;
-            color: #ffffff;
-            font-family: Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
-            padding: 0;
-            height: 100vh;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem 20px 4rem;
+        }
+
+        .hero { text-align: center; margin: 2.5rem auto 2rem; }
+        .hero .tagline {
+            color: var(--muted);
+            font-size: 0.85rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+        .hero .price-headline {
+            font-size: clamp(2.6rem, 8vw, 5rem);
+            line-height: 1;
+            font-weight: 800;
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+        }
+        .hero .price-symbol { color: var(--muted); font-weight: 600; margin-right: 0.15em; }
+        .hero .price-change { font-size: 1.1rem; margin-top: 0.6rem; font-variant-numeric: tabular-nums; }
+        .hero .price-change.positive { color: var(--positive); }
+        .hero .price-change.negative { color: var(--negative); }
+        .hero .price-change .muted { color: var(--muted); margin-left: 6px; font-size: 0.9rem; }
+
+        .sparkline-wrap {
+            max-width: 560px;
+            margin: 1.5rem auto 0;
+            height: 64px;
+        }
+        .sparkline-wrap svg { width: 100%; height: 100%; display: block; }
+
+        .stat-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin: 2.75rem 0;
+        }
+        .stat-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .stat-label {
+            color: var(--muted);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+            line-height: 1.1;
+        }
+        .stat-value .unit { color: var(--muted); font-size: 0.7em; margin-left: 1px; margin-right: 6px; font-weight: 500; }
+        .stat-sub { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
+
+        .mission {
+            text-align: center;
+            color: var(--muted);
+            max-width: 640px;
+            margin: 1rem auto 0;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+        .mission strong { color: var(--text); font-weight: 600; }
+
+        .nav-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin: 3rem 0 1rem;
+        }
+        .nav-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            text-decoration: none;
+            color: var(--text);
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            gap: 8px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
         }
-
-        h1 {
-            font-size: 4rem;
-            margin-bottom: 2rem;
-            color: #f7931a;
+        .nav-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--brand);
         }
-
-        .button-container {
-            display: flex;
-            gap: 2rem;
+        .nav-card.disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            pointer-events: none;
         }
-
-        .nav-button {
-            padding: 1rem 2rem;
-            font-size: 1.2rem;
-            background-color: #333333;
-            color: #f7931a;
-            border: 1px solid #f7931a;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.3s;
+        .nav-card-tag {
+            font-size: 0.68rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: var(--bg);
+            color: var(--muted);
+            border: 1px solid var(--border);
+            width: max-content;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
         }
+        .nav-card-title { font-size: 1.15rem; font-weight: 700; }
+        .nav-card-blurb { color: var(--muted); font-size: 0.93rem; line-height: 1.5; }
 
-        .nav-button:hover {
-            background-color: #f7931a;
-            color: white;
+        @media (max-width: 480px) {
+            .container { padding: 1rem 14px 3rem; }
+            .hero { margin: 1.5rem auto 1.5rem; }
+            .stat-card { padding: 12px; }
+            .stat-value { font-size: 1.25rem; }
         }
     </style>
 </head>
 <body>
-    <h1>BitViz</h1>
-    <div class="button-container">
-        <a href="/bitcoin-price" class="nav-button">Price</a>
-        <a href="/bitcoin-metrics" class="nav-button">Metrics</a>
+    {% include 'partials/_header.html' %}
+    <div class="container">
+        <section class="hero">
+            <div class="tagline">Bitcoin for humans</div>
+            <div class="price-headline">
+                <span class="price-symbol" id="heroSymbol">£</span><span id="heroPrice">—</span>
+            </div>
+            <div class="price-change" id="heroChange">—</div>
+            <div class="sparkline-wrap" id="heroSparkline" aria-hidden="true"></div>
+        </section>
+
+        <section class="stat-strip">
+            <div class="stat-card">
+                <div class="stat-label">Block height</div>
+                <div class="stat-value" id="statHeight">—</div>
+                <div class="stat-sub">updated live</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Next halving</div>
+                <div class="stat-value" id="statHalving">—</div>
+                <div class="stat-sub" id="statHalvingDate">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">From all-time high</div>
+                <div class="stat-value" id="statDrawdown">—</div>
+                <div class="stat-sub">drawdown</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Cycle top</div>
+                <div class="stat-value" id="statTopDays">—</div>
+                <div class="stat-sub">days since</div>
+            </div>
+        </section>
+
+        <p class="mission">
+            BitViz exists to help people <strong>understand</strong> Bitcoin, not just trade it.
+            Macro context, network health, supply schedule and the human story behind a 21-million-coin protocol — all in one place.
+        </p>
+
+        <section class="nav-cards">
+            <a href="/bitcoin-price" class="nav-card">
+                <div class="nav-card-tag">Price</div>
+                <div class="nav-card-title">Price &amp; history</div>
+                <div class="nav-card-blurb">Spot in GBP, USD or sats, 24-hour movement, and a clean interactive history back to launch.</div>
+            </a>
+            <a href="/bitcoin-metrics" class="nav-card">
+                <div class="nav-card-tag">Network</div>
+                <div class="nav-card-title">Live network metrics</div>
+                <div class="nav-card-blurb">Cycle position, supply schedule, miner economics, addresses, fees, nodes, and macro context.</div>
+            </a>
+            <a href="#" class="nav-card disabled" aria-disabled="true">
+                <div class="nav-card-tag">Story · soon</div>
+                <div class="nav-card-title">Bitcoin for humans</div>
+                <div class="nav-card-blurb">A first-principles walk through what makes Bitcoin special — from beads to gold to a shared protocol.</div>
+            </a>
+        </section>
     </div>
+
+    <script>
+    (function(){
+        // --- Hero price (CoinGecko spot) ---
+        async function fetchSpot(){
+            try {
+                const ccy = BV.fx.mode.toLowerCase();
+                const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${ccy}&include_24hr_change=true`);
+                if (!r.ok) return;
+                const j = await r.json();
+                const price = j.bitcoin && j.bitcoin[ccy];
+                const change = j.bitcoin && j.bitcoin[`${ccy}_24h_change`];
+                if (price == null) return;
+                const locale = BV.fx.mode === 'GBP' ? 'en-GB' : 'en-US';
+                document.getElementById('heroSymbol').textContent = BV.symbol();
+                document.getElementById('heroPrice').textContent = price.toLocaleString(locale, { maximumFractionDigits: 0 });
+                const chEl = document.getElementById('heroChange');
+                if (change != null) {
+                    const sign = change >= 0 ? '+' : '';
+                    chEl.innerHTML = `${sign}${change.toFixed(2)}% <span class="muted">past 24h</span>`;
+                    chEl.classList.toggle('positive', change >= 0);
+                    chEl.classList.toggle('negative', change < 0);
+                }
+            } catch(e){ console.error('hero spot fetch failed', e); }
+        }
+
+        // --- Sparkline ---
+        function renderSparkline(values){
+            const container = document.getElementById('heroSparkline');
+            container.innerHTML = '';
+            if (!values || values.length < 2) return;
+            const w = container.clientWidth || 560;
+            const h = container.clientHeight || 64;
+            const pad = 2;
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            const range = max - min || 1;
+            const stepX = (w - pad * 2) / (values.length - 1);
+            const points = values.map((v, i) => {
+                const x = pad + i * stepX;
+                const y = h - pad - ((v - min) / range) * (h - pad * 2);
+                return `${x.toFixed(2)},${y.toFixed(2)}`;
+            }).join(' ');
+            const first = values[0];
+            const last = values[values.length - 1];
+            const isUp = last >= first;
+            const colour = isUp ? 'var(--positive)' : 'var(--negative)';
+            const areaPoints = `${pad},${h} ${points} ${w - pad},${h}`;
+            const svg = `
+                <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+                    <polygon points="${areaPoints}" fill="${colour}" opacity="0.12"></polygon>
+                    <polyline points="${points}" fill="none" stroke="${colour}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                </svg>`;
+            container.innerHTML = svg;
+        }
+        async function fetchSparkline(){
+            try {
+                const r = await fetch('/api/sparkline/price');
+                if (!r.ok) return;
+                const j = await r.json();
+                renderSparkline(j.values || []);
+            } catch(e){ console.error('sparkline fetch failed', e); }
+        }
+
+        // --- Stats: drawdown + cycle top from market-structure ---
+        async function fetchMarketStructure(){
+            try {
+                const r = await fetch('/api/market-structure');
+                if (!r.ok) return;
+                const m = await r.json();
+                if (m.drawdown_from_ath_pct != null) {
+                    const dd = m.drawdown_from_ath_pct;
+                    const el = document.getElementById('statDrawdown');
+                    el.textContent = (dd >= 0 ? '+' : '') + dd.toFixed(1) + '%';
+                    el.style.color = dd <= -20 ? 'var(--negative)' : (dd >= -5 ? 'var(--positive)' : 'var(--text)');
+                }
+                if (m.days_since_cycle_top != null) {
+                    document.getElementById('statTopDays').innerHTML = `${m.days_since_cycle_top}<span class="unit">d</span>`;
+                }
+            } catch(e){ console.error('market-structure fetch failed', e); }
+        }
+
+        // --- Halving countdown (derives from /api/onchain-supply, ticks locally) ---
+        let halvingEtaMs = null;
+        async function fetchHalving(){
+            try {
+                const r = await fetch('/api/onchain-supply');
+                if (!r.ok) return;
+                const s = await r.json();
+                if (s.eta_utc) {
+                    halvingEtaMs = new Date(s.eta_utc).getTime();
+                    document.getElementById('statHalvingDate').textContent =
+                        new Date(halvingEtaMs).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                    tickHalving();
+                }
+                if (typeof s.height === 'number') {
+                    document.getElementById('statHeight').textContent = s.height.toLocaleString();
+                }
+            } catch(e){ console.error('onchain-supply fetch failed', e); }
+        }
+        function tickHalving(){
+            if (!halvingEtaMs) return;
+            const diff = halvingEtaMs - Date.now();
+            const el = document.getElementById('statHalving');
+            if (diff <= 0) { el.textContent = 'soon'; return; }
+            const days = Math.floor(diff / 86400000);
+            const hours = Math.floor((diff % 86400000) / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            el.innerHTML = `${days}<span class="unit">d</span>${hours}<span class="unit">h</span>${mins}<span class="unit">m</span>`;
+        }
+
+        // Wire up: BV header already polls tip height, mirror it into the stat card too
+        window.addEventListener('bv:tip-update', (e) => {
+            const el = document.getElementById('statHeight');
+            if (el && typeof e.detail.height === 'number') el.textContent = e.detail.height.toLocaleString();
+        });
+
+        // Re-render currency-sensitive bits when global currency changes
+        window.addEventListener('bv:currency-change', () => {
+            fetchSpot();
+        });
+
+        // Kick off
+        BV.fetchFx().then(fetchSpot);
+        fetchSparkline();
+        fetchMarketStructure();
+        fetchHalving();
+
+        // Periodic refresh
+        setInterval(fetchSpot, 30_000);
+        setInterval(tickHalving, 60_000);
+        setInterval(fetchSparkline, 15 * 60_000);
+    })();
+    </script>
 </body>
 </html>

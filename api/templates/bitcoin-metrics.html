@@ -6,31 +6,6 @@
     <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
     <script src="https://unpkg.com/topojson@3"></script>
     <style>
-        /* Theme variables */
-        :root {
-            --bg: #0f172a;
-            --text: #e2e8f0;
-            --muted: #94a3b8;
-            --panel: #1e293b;
-            --brand: #f7931a;
-            --tooltip-bg: #334155;
-            --tooltip-text: #e2e8f0;
-            --map-fill: #1e293b;
-            --map-stroke: #94a3b8;
-        }
-
-        :root[data-theme="light"] {
-            --bg: #f8fafc;
-            --text: #0f172a;
-            --muted: #475569;
-            --panel: #ffffff;
-            --brand: #f7931a;
-            --tooltip-bg: #ffffff;
-            --tooltip-text: #0f172a;
-            --map-fill: #e2e8f0;   /* slate-200 for land */
-            --map-stroke: #94a3b8; /* slate-400 for borders */
-        }
-
         body {
             background-color: var(--bg);
             color: var(--muted);
@@ -203,83 +178,49 @@
             height: 1000px;
         }
 
+        @media (max-width: 720px) {
+            .container { padding: 1rem 14px; }
+            .title { font-size: 1.2rem; margin-bottom: 1rem; }
+            .metric-card { padding: 1rem; }
+            .metric-card.users  { height: auto; min-height: 480px; }
+            .metric-card.miners { height: auto; min-height: 420px; }
+            .metric-card.nodes  { height: clamp(360px, 70vh, 720px); }
+            .visualization.users-viz  { height: 280px; }
+            .visualization.miners-viz { height: 320px; }
+            .x-axis text, .y-axis text { font-size: 11px; }
+            .tile-value { font-size: 1.05rem; }
+        }
+        @media (max-width: 480px) {
+            .container { padding: 0.75rem 10px; }
+            .metric-card { border-radius: 10px; padding: 0.85rem; }
+            .visualization.users-viz  { height: 220px; }
+            .visualization.miners-viz { height: 260px; }
+            .metric-card.nodes  { height: clamp(300px, 60vh, 560px); }
+            h2 { font-size: 1.05rem; margin: 0 0 0.5rem; }
+        }
+
         .metric-card:last-child {
             margin-bottom: 0;
         }
 
-        .home-button {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.3s;
-            line-height: 0;
+        /* Metric tiles */
+        .metric-tile { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; position: relative; }
+        .tile-label { font-size: .8rem; color: var(--muted); margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .tile-value { font-size: 1.25rem; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+        .tile-value .unit { color: var(--muted); font-size: 0.7em; margin-left: 1px; margin-right: 5px; font-weight: 500; }
+        .tile-sub { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+        .tile-value.flash { animation: tile-flash 1.4s ease-out; }
+        @keyframes tile-flash {
+            0% { color: var(--brand); }
+            100% { color: var(--text); }
         }
-
-        .home-button svg {
-            width: 28px;
-            height: 28px;
-            fill: var(--muted);
-            transition: fill 0.3s;
-        }
-
-        .home-button:hover svg { fill: var(--brand); }
-
-        /* Theme toggle */
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 36px;
-            height: 36px;
-            border-radius: 9999px;
-            border: 1px solid var(--muted);
-            background: var(--panel);
-            color: var(--muted);
-            display: grid;
-            place-items: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .theme-toggle:hover { border-color: var(--brand); color: var(--brand); }
-        .theme-toggle svg { width: 18px; height: 18px; }
-
-        /* Basic tiles styling injection (keeps CSS block small) */
-        (function injectTileStyles(){
-            const css = `
-            .metric-tile{background:var(--panel);border:1px solid rgba(148,163,184,0.25);border-radius:10px;padding:12px}
-            .tile-label{font-size:.8rem;color:var(--muted);margin-bottom:4px}
-            .tile-value{font-size:1.25rem;color:var(--text);font-weight:600}
-            `;
-            const s=document.createElement('style');s.textContent=css;document.head.appendChild(s);
-        })();
     </style>
 </head>
 <body>
-    <a href="/" class="home-button">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 21H5a1 1 0 0 1-1-1v-9H1l10.327-9.388a1 1 0 0 1 1.346 0L23 11h-3v9a1 1 0 0 1-1 1zm-6-2h5v-9.15L12 4.2l-6 5.65V19h5v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3z"/>
-        </svg>
-    </a>
+    {% include 'partials/_header.html' %}
     <div class="container">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:1rem;">
+        <div style="margin-bottom:1rem;">
             <h1 class="title" style="margin:0">Bitcoin Network Metrics</h1>
-            <!-- Theme toggle (inline in header) -->
-            <div style="display:flex; align-items:center; gap:8px;">
-            <button id="fxToggle" class="theme-toggle" aria-label="Toggle currency" title="Toggle currency" style="position:static; width:42px;">
-                <span id="fxLabel" style="font-size:.85rem;">GBP</span>
-            </button>
-            <button id="themeToggle" class="theme-toggle" aria-label="Toggle color theme" title="Toggle theme" style="position:static;">
-                <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="5"></circle>
-                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-                </svg>
-                <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                </svg>
-            </button>
-            </div>
         </div>
 
         <!-- Price & Market section -->
@@ -397,47 +338,113 @@
     </div>
 
     <script>
-        // Minimal theme init and toggle
-        (function initTheme() {
-            const root = document.documentElement;
-            const saved = localStorage.getItem('theme');
-            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-            const initial = saved || (prefersLight ? 'light' : 'dark');
-            root.setAttribute('data-theme', initial);
-            const iconSun = document.getElementById('iconSun');
-            const iconMoon = document.getElementById('iconMoon');
-            if (iconSun && iconMoon) {
-                const isLight = initial === 'light';
-                iconSun.style.display = isLight ? 'none' : '';
-                iconMoon.style.display = isLight ? '' : 'none';
-            }
-        })();
-
-        (function wireThemeToggle(){
-            const btn = document.getElementById('themeToggle');
-            if (!btn) return;
-            btn.addEventListener('click', () => {
-                const root = document.documentElement;
-                const current = root.getAttribute('data-theme') || 'dark';
-                const next = current === 'light' ? 'dark' : 'light';
-                root.setAttribute('data-theme', next);
-                localStorage.setItem('theme', next);
-                const iconSun = document.getElementById('iconSun');
-                const iconMoon = document.getElementById('iconMoon');
-                if (iconSun && iconMoon) {
-                    const isLight = next === 'light';
-                    iconSun.style.display = isLight ? 'none' : '';
-                    iconMoon.style.display = isLight ? '' : 'none';
-                }
-            });
-        })();
-
         let currentTimeRange = '30days';
+        // Currency/theme/tip pill now owned by partials/_header.html (window.BV)
+        const fx = window.BV.fx;
 
-        // Currency state and FX fetch (shared across cards)
-        let fx = { mode: 'GBP', gbp_per_usd: 0.78 };
-        async function fetchFx(){
-            try{ const r=await fetch('/api/fx-rate'); if(r.ok){ const j=await r.json(); fx.gbp_per_usd=j.gbp_per_usd||fx.gbp_per_usd; } }catch(_){/*noop*/}
+        // --- Metric tile explanations ---
+        const TILE_INFO = {
+            // Price & Market
+            'ms-spot':       { title: 'Spot price', desc: 'The current Bitcoin price from a live feed. Updates every few minutes.' },
+            'ms-ath':        { title: 'All-time high', desc: 'The highest closing price ever recorded.' },
+            'ms-dd':         { title: 'Drawdown from ATH', desc: 'How far the current price sits below the all-time high. Closer to 0% means a fresh high; deep negatives signal a bear market.',
+                               bands: [
+                                   { label: '0% to −20%: near highs', colour: 'var(--positive)' },
+                                   { label: '−20% to −50%: correction', colour: 'var(--brand)' },
+                                   { label: 'below −50%: deep bear', colour: 'var(--negative)' }
+                               ] },
+            'ms-vol30':      { title: '30-day volatility (annualised)', desc: 'How wildly the price has swung over the last month, scaled to a yearly figure for comparison with other assets.' },
+            'ms-vol90':      { title: '90-day volatility (annualised)', desc: 'Same idea over a 3-month window. Smoother signal of how turbulent the market is.' },
+            'ms-pctabove':   { title: '% of days above current price', desc: 'Out of all trading days on record, the share where price closed above today\'s level. Lower = today is historically high.' },
+            'ms-sma200':     { title: '200-day moving average', desc: 'The average closing price of the last 200 days. A widely watched long-term trend line.' },
+            'ms-mayer':      { title: 'Mayer Multiple', desc: 'Price divided by the 200-day moving average. A classic Bitcoin cycle gauge.',
+                               bands: [
+                                   { label: '< 1.0: historically cheap', colour: 'var(--positive)' },
+                                   { label: '1.0–2.4: neutral / trending', colour: 'var(--brand)' },
+                                   { label: '> 2.4: historically hot', colour: 'var(--negative)' }
+                               ] },
+            'ms-smaDist':    { title: 'Distance to 200-day SMA', desc: 'How far price is above (+) or below (−) the long-term trend line, in percent.' },
+            'ms-topDays':    { title: 'Days since cycle top', desc: 'Number of days since the highest price in the last ~4 years. Useful for cycle positioning.' },
+            'ms-bottomDays': { title: 'Days since cycle bottom', desc: 'Number of days since the lowest price in the last ~4 years.' },
+
+            // On-chain supply
+            'oc-height':     { title: 'Current block height', desc: 'The number of the latest block mined. Every ~10 minutes a new block is added.' },
+            'oc-epoch':      { title: 'Halving epoch', desc: 'Which 210,000-block era we are in. The subsidy halves at the end of each epoch — this is Bitcoin\'s hard-coded disinflation.' },
+            'oc-bth':        { title: 'Blocks to halving', desc: 'How many blocks until the next subsidy halving. About 144 blocks pass per day.' },
+            'oc-eta':        { title: 'Halving ETA', desc: 'Estimated calendar date for the next halving, assuming 10-minute blocks.' },
+            'oc-subsidy':    { title: 'Current block subsidy', desc: 'Newly issued BTC per block. Halves every four years until issuance ends near 2140.' },
+            'oc-issue':      { title: 'Annual issuance (BTC)', desc: 'Roughly how many new BTC enter circulation per year at the current subsidy.' },
+            'oc-circ':       { title: 'Circulating supply', desc: 'Bitcoin in existence today. Will asymptotically approach 21,000,000.' },
+            'oc-max':        { title: 'Maximum supply', desc: 'The hard-coded cap. There will never be more than 21,000,000 BTC.' },
+            'oc-circpct':    { title: '% of max supply mined', desc: 'Share of the eventual 21 million BTC that already exists.' },
+
+            // Miner & Economics
+            'me-hr':         { title: 'Hashrate (7-day average)', desc: 'Total computing power securing the network, smoothed over a week. More hashrate = harder to attack.' },
+            'me-rev':        { title: 'Miner revenue', desc: 'Total miner income for the latest day (subsidy + fees), in your selected currency.' },
+            'me-fees':       { title: 'Transaction fees paid', desc: 'Total fees users paid to miners that day. Rises when block space is in demand.' },
+            'me-feesPct':    { title: 'Fees as % of revenue', desc: 'Share of miner income that comes from fees rather than subsidy. Long-term security depends on this rising as the subsidy falls.' },
+
+            // Adoption & Usage
+            'au-ln':         { title: 'Lightning Network capacity', desc: 'Total BTC locked into public Lightning channels — a rough proxy for Layer 2 settlement headroom.' },
+            'au-aa':         { title: 'Active addresses (daily)', desc: 'Distinct addresses that sent or received BTC on chain in the last 24 hours.' },
+            'au-tx':         { title: 'Transactions per day', desc: 'On-chain transactions confirmed in the latest day.' },
+            'au-fee':        { title: 'Average fee per transaction', desc: 'Mean fee paid by an on-chain transaction. Spikes when block space is congested.' },
+
+            // Macro & Context
+            'mc-gbpPerUsd':  { title: 'GBP per USD', desc: 'How many British pounds one US dollar buys today.' },
+            'mc-usdPerGbp':  { title: 'USD per GBP', desc: 'How many US dollars one British pound buys today — the inverse of the rate above.' },
+            'mc-ch30':       { title: 'GBP/USD 30-day change', desc: 'How much the rate has moved over the last month.' },
+            'mc-ch1y':       { title: 'GBP/USD 1-year change', desc: 'How much the rate has moved over the last year.' },
+            'mc-high':       { title: 'GBP/USD 1-year high', desc: 'Highest GBP/USD rate seen in the last 12 months.' },
+            'mc-low':        { title: 'GBP/USD 1-year low', desc: 'Lowest GBP/USD rate seen in the last 12 months.' },
+            'mc-pos':        { title: 'Position in 1-year range', desc: 'Where today\'s rate sits between the 1-year low (0%) and 1-year high (100%).' },
+            'mc-cpiUK':      { title: 'UK CPI (YoY)', desc: 'UK Consumer Price Index — yearly inflation rate. Compare to Bitcoin\'s fixed supply schedule.' },
+            'mc-cpiUS':      { title: 'US CPI (YoY)', desc: 'US Consumer Price Index — yearly inflation rate. Useful context for Bitcoin\'s appeal as hard money.' }
+        };
+
+        // --- Sparklines: tile id -> sparkline endpoint key ---
+        const TILE_SPARKLINES = {
+            'ms-spot':      'price',
+            'me-hr':        'hashrate',
+            'au-aa':        'active-addresses',
+            'au-tx':        'transactions',
+            'mc-gbpPerUsd': 'fx-gbpusd'
+        };
+        function attachTileSparklines(){
+            Object.entries(TILE_SPARKLINES).forEach(([tileId, key]) => {
+                const valueEl = document.getElementById(tileId);
+                if (!valueEl) return;
+                const tile = valueEl.closest('.metric-tile');
+                if (!tile || tile.querySelector('.bv-sparkline')) return;
+                const spark = document.createElement('div');
+                spark.className = 'bv-sparkline';
+                spark.dataset.sparklineKey = key;
+                tile.appendChild(spark);
+                // defer so layout has settled
+                requestAnimationFrame(() => BV.loadSparkline(spark, key));
+            });
+        }
+
+        function attachTileInfoIcons(){
+            Object.keys(TILE_INFO).forEach(id => {
+                const valueEl = document.getElementById(id);
+                if (!valueEl) return;
+                const tile = valueEl.closest('.metric-tile');
+                if (!tile) return;
+                const label = tile.querySelector('.tile-label');
+                if (!label || label.querySelector('.bv-info-icon')) return;
+                const icon = BV.makeInfoIcon(TILE_INFO[id]);
+                label.appendChild(icon);
+            });
+        }
+        function setupTileEnhancements(){
+            attachTileInfoIcons();
+            attachTileSparklines();
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupTileEnhancements);
+        } else {
+            setupTileEnhancements();
         }
 
         // Cache for API responses to handle rate limiting
@@ -933,6 +940,10 @@
             }
         }
 
+        // Halving countdown state (updated by loadOnchainSupply, tick by tickHalvingCountdown)
+        let nextHalvingHeight = null;
+        let halvingEtaMs = null;
+
         async function loadOnchainSupply(){
             try{
                 console.log('[metrics] calling loadOnchainSupply');
@@ -943,17 +954,73 @@
                 document.getElementById('oc-height').textContent = f(s.height);
                 document.getElementById('oc-epoch').textContent = f(s.epoch);
                 document.getElementById('oc-bth').textContent = f(s.blocks_to_halving);
-                document.getElementById('oc-eta').textContent = s.eta_utc ? new Date(s.eta_utc).toLocaleDateString('en-GB') : '—';
                 document.getElementById('oc-subsidy').textContent = f(s.current_subsidy_btc,{maximumFractionDigits:8});
                 document.getElementById('oc-issue').textContent = f(s.annual_issuance_btc,{maximumFractionDigits:0});
                 document.getElementById('oc-circ').textContent = f(s.circulating_supply,{maximumFractionDigits:0});
                 document.getElementById('oc-max').textContent = f(s.max_supply,{maximumFractionDigits:0});
                 document.getElementById('oc-circpct').textContent = f(s.circulating_pct_of_max,{maximumFractionDigits:2})+'%';
+
+                nextHalvingHeight = s.next_halving_height || null;
+                halvingEtaMs = s.eta_utc ? new Date(s.eta_utc).getTime() : null;
+                // Convert the ETA tile to a live countdown + date sub-line
+                const etaTile = document.getElementById('oc-eta');
+                if (etaTile && !etaTile.dataset.countdownReady) {
+                    const parent = etaTile.parentElement;
+                    const sub = document.createElement('div');
+                    sub.className = 'tile-sub';
+                    sub.id = 'oc-eta-date';
+                    parent.appendChild(sub);
+                    etaTile.dataset.countdownReady = '1';
+                }
+                tickHalvingCountdown();
                 console.log('[metrics] loadOnchainSupply done');
             }catch(e){
                 console.error('onchain-supply fetch failed', e);
             }
         }
+
+        function tickHalvingCountdown(){
+            const etaEl = document.getElementById('oc-eta');
+            const subEl = document.getElementById('oc-eta-date');
+            if (!etaEl) return;
+            if (!halvingEtaMs) { etaEl.textContent = '—'; return; }
+            const diff = halvingEtaMs - Date.now();
+            if (diff <= 0) { etaEl.textContent = 'happening'; return; }
+            const days  = Math.floor(diff / 86400000);
+            const hours = Math.floor((diff % 86400000) / 3600000);
+            const mins  = Math.floor((diff % 3600000) / 60000);
+            const secs  = Math.floor((diff % 60000) / 1000);
+            etaEl.innerHTML = `${days}<span class="unit">d</span>${String(hours).padStart(2,'0')}<span class="unit">h</span>${String(mins).padStart(2,'0')}<span class="unit">m</span>${String(secs).padStart(2,'0')}<span class="unit">s</span>`;
+            if (subEl) {
+                subEl.textContent = new Date(halvingEtaMs).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+            }
+        }
+        setInterval(tickHalvingCountdown, 1000);
+
+        // Live tip-height updates from the header pill -> patch height & blocks-to-halving locally
+        window.addEventListener('bv:tip-update', (e) => {
+            const h = e && e.detail && e.detail.height;
+            if (typeof h !== 'number') return;
+            const heightEl = document.getElementById('oc-height');
+            if (heightEl) {
+                const prev = heightEl.textContent;
+                const nextStr = h.toLocaleString('en-GB');
+                if (prev !== nextStr) {
+                    heightEl.textContent = nextStr;
+                    heightEl.classList.remove('flash');
+                    void heightEl.offsetWidth; // restart animation
+                    heightEl.classList.add('flash');
+                }
+            }
+            if (nextHalvingHeight) {
+                const bthEl = document.getElementById('oc-bth');
+                if (bthEl) bthEl.textContent = Math.max(0, nextHalvingHeight - h).toLocaleString('en-GB');
+                // Re-estimate ETA on each new block: 10 min per remaining block
+                const remaining = Math.max(0, nextHalvingHeight - h);
+                halvingEtaMs = Date.now() + remaining * 10 * 60 * 1000;
+                tickHalvingCountdown();
+            }
+        });
 
         async function loadMinerEconomics(){
             try{
@@ -1004,22 +1071,15 @@
         }
 
         // Initial load
-        fetchFx().then(()=>{ console.log('[metrics] init loading...'); loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); setTimeout(loadMacro, 100); });
+        BV.fetchFx().then(()=>{ console.log('[metrics] init loading...'); loadMarketStructure(); loadOnchainSupply(); loadMinerEconomics(); loadAdoptionUsage(); setTimeout(loadMacro, 100); });
         fetchNetworkData();
         // Update every 5 minutes
         setInterval(fetchNetworkData, CACHE_DURATION);
 
-        // Currency toggle wiring
-        document.getElementById('fxToggle').addEventListener('click', async ()=>{
-            fx.mode = fx.mode==='GBP' ? 'USD' : 'GBP';
-            document.getElementById('fxLabel').textContent = fx.mode;
-            await fetchFx();
-            // Re-render currency-sensitive tiles
-            await loadMarketStructure();
-            await loadMinerEconomics();
-            await loadAdoptionUsage();
-            // Price & Market: just re-fetch market structure (it returns GBP values); for now display GBP only
-            // Optionally, later extend backend to return USD too.
+        // Re-render currency-sensitive tiles when global currency changes
+        window.addEventListener('bv:currency-change', async () => {
+            await BV.fetchFx();
+            await Promise.all([loadMarketStructure(), loadMinerEconomics(), loadAdoptionUsage()]);
         });
 
         // Global error handler to surface script errors
