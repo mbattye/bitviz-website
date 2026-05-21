@@ -679,59 +679,81 @@ def sparkline(key):
 
 @app.route('/api/bitcoin-historical/<range>')
 def get_historical_data(range):
-    print(f"Received request for range: {range}")
-    
+    """Historical BTC/GBP prices, sourced from CoinGecko market_chart.
+    The local CSV is kept as a deep-history fallback for 'ALL' only."""
+    range_to_days = {
+        '1M': '30',
+        '3M': '90',
+        '6M': '180',
+        '1Y': '365',
+        'ALL': 'max',
+    }
+    days = range_to_days.get(range)
+    if days is None:
+        return jsonify({'error': f'Invalid range: {range}'}), 400
+
+    cache_dir = Path(__file__).parent / 'data'
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / f'historical_{range}.json'
+    now = datetime.utcnow()
+
+    # 15 min cache for short ranges, 6h for 1Y/ALL (less volatile, slower-changing endpoint)
+    ttl = timedelta(minutes=15) if range in ('1M', '3M', '6M') else timedelta(hours=6)
+    cached = _cached_json(cache_file, ttl)
+    if cached and 'prices' in cached:
+        return jsonify(cached)
+
     try:
-        # Load the CSV file
-        csv_path = Path(__file__).parent / 'data' / 'bitcoin_historical.csv'
-        
-        if not csv_path.exists():
-            print(f"CSV file not found at {csv_path}")
-            return jsonify({'error': 'Historical data file not found'}), 404
-        
-        # Convert range to days
-        days_map = {
-            '1M': 30,
-            '3M': 90,
-            '6M': 180,
-            '1Y': 365,
-            'ALL': None
-        }
-        
-        days = days_map.get(range)
-        if days is None and range != 'ALL':
-            return jsonify({'error': f'Invalid range: {range}'}), 400
-            
-        cutoff_date = None
-        if days:
-            cutoff_date = datetime.now() - timedelta(days=days)
-        
+        r = requests.get(
+            'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart',
+            params={'vs_currency': 'gbp', 'days': days, 'interval': 'daily' if days != 'max' else None},
+            timeout=20,
+        )
+        r.raise_for_status()
+        j = r.json()
+        raw = j.get('prices', [])
+        # Normalize to [[ms, price], ...]
         prices = []
-        with open(csv_path, 'r') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
+        for pt in raw:
+            if isinstance(pt, list) and len(pt) >= 2:
                 try:
-                    date = datetime.strptime(row['Date'], '%Y-%m-%d')
-                    if cutoff_date and date < cutoff_date:
-                        continue
-                    # Convert date to timestamp in milliseconds
-                    timestamp = int(time.mktime(date.timetuple()) * 1000)
-                    price = float(row['Close'])
-                    prices.append([timestamp, price])
-                except (ValueError, KeyError) as e:
-                    print(f"Error processing row: {row}, Error: {e}")
+                    prices.append([int(pt[0]), float(pt[1])])
+                except Exception:
                     continue
-        
         if not prices:
-            print(f"No data found for range: {range}")
-            return jsonify({'error': 'No data available for the specified range'}), 404
-            
-        print(f"Returning {len(prices)} data points for range: {range}")
-        return jsonify({'prices': prices})
-            
+            raise RuntimeError('empty prices from upstream')
+        payload = {'prices': prices, 'source': 'coingecko'}
+        _write_cache(cache_file, payload)
+        return jsonify(payload)
     except Exception as e:
-        print(f"Error in handler: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        # Stale cache fallback
+        if cache_file.exists():
+            try:
+                cached = json.loads(cache_file.read_text())
+                data = cached.get('data') or {}
+                if 'prices' in data:
+                    return jsonify(data)
+            except Exception:
+                pass
+        # Last-resort CSV fallback for ALL
+        if range == 'ALL':
+            csv_path = cache_dir / 'bitcoin_historical.csv'
+            if csv_path.exists():
+                prices = []
+                try:
+                    with open(csv_path, 'r') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            try:
+                                d = datetime.strptime(row['Date'], '%Y-%m-%d')
+                                prices.append([int(time.mktime(d.timetuple()) * 1000), float(row['Close'])])
+                            except Exception:
+                                continue
+                    if prices:
+                        return jsonify({'prices': prices, 'source': 'csv-fallback'})
+                except Exception:
+                    pass
+        return jsonify({'error': str(e)}), 502
 
 if __name__ == '__main__':
     app.run(threaded=True)
