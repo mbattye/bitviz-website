@@ -79,6 +79,10 @@ def priced_in_page():
 def cycles_page():
     return render_template('cycles.html')
 
+@app.route('/debasement')
+def debasement_page():
+    return render_template('debasement.html')
+
 @app.route('/api/nodes-latest')
 def nodes_latest():
     try:
@@ -769,6 +773,428 @@ def get_historical_data(range):
             except Exception:
                 pass
         return jsonify({'error': str(e)}), 502
+
+# --------------------------------------------------------------------------- #
+# Fiat debasement — /debasement
+# --------------------------------------------------------------------------- #
+
+def _fetch_fred_csv(series_id: str, cache_dir: Path) -> List[Tuple[datetime, float]]:
+    """Fetch a monthly FRED series as CSV. Cached 24h."""
+    cache_file = cache_dir / f'fred_{series_id.lower()}_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=24))
+    if cached and 'series' in cached:
+        out = []
+        for d, v in cached['series']:
+            try:
+                out.append((datetime.fromisoformat(d), float(v)))
+            except Exception:
+                continue
+        if out:
+            return out
+    try:
+        r = requests.get(
+            f'https://fred.stlouisfed.org/graph/fredgraph.csv',
+            params={'id': series_id},
+            timeout=30,
+            headers={'User-Agent': 'Mozilla/5.0'},
+        )
+        if not r.ok:
+            return []
+        result: List[Tuple[datetime, float]] = []
+        lines = r.text.strip().split('\n')
+        # Header: observation_date,<SERIES_ID>
+        for line in lines[1:]:
+            parts = line.split(',')
+            if len(parts) < 2:
+                continue
+            try:
+                d = datetime.strptime(parts[0].strip(), '%Y-%m-%d')
+                val = float(parts[1].strip())
+                result.append((d, val))
+            except Exception:
+                continue
+        if result:
+            _write_cache(cache_file, {'series': [[d.isoformat(), v] for d, v in result]})
+        return result
+    except Exception:
+        return []
+
+def _fetch_worldbank_indicator(country: str, indicator: str, cache_dir: Path) -> List[Tuple[datetime, float]]:
+    """Fetch annual values for a World Bank indicator (e.g. broad money
+    FM.LBL.BMNY.CN). Returned series uses Jan 1 of each reporting year as
+    the date. Cached 24h.
+    """
+    cache_file = cache_dir / f'wb_{country.lower()}_{indicator.lower().replace(".", "_")}_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=24))
+    if cached and 'series' in cached:
+        out = []
+        for d, v in cached['series']:
+            try:
+                out.append((datetime.fromisoformat(d), float(v)))
+            except Exception:
+                continue
+        if out:
+            return out
+    try:
+        r = requests.get(
+            f'https://api.worldbank.org/v2/country/{country}/indicator/{indicator}',
+            params={'format': 'json', 'per_page': 200, 'date': '1990:2030'},
+            timeout=30,
+            headers={'User-Agent': 'Mozilla/5.0'},
+        )
+        if not r.ok:
+            return []
+        j = r.json()
+        rows = j[1] if isinstance(j, list) and len(j) >= 2 and j[1] else []
+        result: List[Tuple[datetime, float]] = []
+        for entry in rows:
+            try:
+                val = entry.get('value')
+                if val is None:
+                    continue
+                year = int(entry['date'])
+                result.append((datetime(year, 1, 1), float(val)))
+            except Exception:
+                continue
+        result.sort(key=lambda x: x[0])
+        if result:
+            _write_cache(cache_file, {'series': [[d.isoformat(), v] for d, v in result]})
+        return result
+    except Exception:
+        return []
+
+def _fetch_ecb_m3(cache_dir: Path) -> List[Tuple[datetime, float]]:
+    """Fetch ECB BSI M3 monthly stocks (euro area). Cached 24h."""
+    cache_file = cache_dir / 'ecb_m3_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=24))
+    if cached and 'series' in cached:
+        out = []
+        for d, v in cached['series']:
+            try:
+                out.append((datetime.fromisoformat(d), float(v)))
+            except Exception:
+                continue
+        if out:
+            return out
+    try:
+        r = requests.get(
+            'https://data-api.ecb.europa.eu/service/data/BSI/M.U2.Y.V.M30.X.1.U2.2300.Z01.E',
+            params={'format': 'csvdata'},
+            timeout=30,
+            headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'text/csv'},
+        )
+        if not r.ok:
+            return []
+        # CSV with TIME_PERIOD column (YYYY-MM) and OBS_VALUE column
+        lines = r.text.strip().split('\n')
+        header = lines[0].split(',')
+        try:
+            tp_idx = header.index('TIME_PERIOD')
+            val_idx = header.index('OBS_VALUE')
+        except ValueError:
+            return []
+        result: List[Tuple[datetime, float]] = []
+        for line in lines[1:]:
+            parts = line.split(',')
+            if len(parts) <= max(tp_idx, val_idx):
+                continue
+            try:
+                d = datetime.strptime(parts[tp_idx], '%Y-%m')
+                val = float(parts[val_idx])
+                result.append((d, val))
+            except Exception:
+                continue
+        if result:
+            _write_cache(cache_file, {'series': [[d.isoformat(), v] for d, v in result]})
+        return result
+    except Exception:
+        return []
+
+def _fetch_boe_m4(cache_dir: Path) -> List[Tuple[datetime, float]]:
+    """Fetch Bank of England M4 monthly level (LPMAUYM, GBP millions). Cached 24h."""
+    cache_file = cache_dir / 'boe_m4_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=24))
+    if cached and 'series' in cached:
+        out = []
+        for d, v in cached['series']:
+            try:
+                out.append((datetime.fromisoformat(d), float(v)))
+            except Exception:
+                continue
+        if out:
+            return out
+    try:
+        r = requests.get(
+            'https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp',
+            params={
+                'csv.x': 'yes',
+                'Datefrom': '01/Jan/2008',
+                'Dateto': 'now',
+                'CSVF': 'TN',
+                'UsingCodes': 'Y',
+                'Filter': 'N',
+                'title': 'LPMAUYM',
+                'VPD': 'Y',
+                'VFD': 'N',
+                'CodeVer': 'new',
+                'SeriesCodes': 'LPMAUYM',
+            },
+            timeout=30,
+            headers={'User-Agent': 'Mozilla/5.0'},
+        )
+        if not r.ok:
+            return []
+        result: List[Tuple[datetime, float]] = []
+        lines = r.text.strip().split('\n')
+        # Header: DATE,LPMAUYM ; rows: "31 Jan 2008,1681358"
+        for line in lines[1:]:
+            parts = line.split(',')
+            if len(parts) < 2:
+                continue
+            try:
+                d = datetime.strptime(parts[0].strip(), '%d %b %Y')
+                val = float(parts[1].strip())
+                result.append((d, val))
+            except Exception:
+                continue
+        if result:
+            _write_cache(cache_file, {'series': [[d.isoformat(), v] for d, v in result]})
+        return result
+    except Exception:
+        return []
+
+def _fetch_uk_cpi_annual(cache_dir: Path) -> dict:
+    """Fetch UK CPI annual % rates from ONS (D7G7). Returns {year_int: rate_pct}.
+    Cached 24h."""
+    cache_file = cache_dir / 'ons_uk_cpi_annual_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=24))
+    if cached and 'rates' in cached:
+        return {int(y): float(r) for y, r in cached['rates'].items()}
+    try:
+        r = requests.get(
+            'https://www.ons.gov.uk/economy/inflationandpriceindices/timeseries/d7g7/mm23/data',
+            timeout=20,
+            headers={'User-Agent': 'Mozilla/5.0'},
+        )
+        if not r.ok:
+            return {}
+        j = r.json()
+        out: dict = {}
+        for entry in j.get('years', []):
+            try:
+                out[int(entry['date'])] = float(entry['value'])
+            except Exception:
+                continue
+        if out:
+            _write_cache(cache_file, {'rates': {str(k): v for k, v in out.items()}})
+        return out
+    except Exception:
+        return {}
+
+# Halving epoch -> subsidy per block
+def _subsidy_for_block(block_height: int) -> float:
+    return 50.0 / (2 ** (block_height // 210_000)) if block_height < 210_000 * 33 else 0.0
+
+# Approximate cumulative BTC supply at a given date.
+# Uses 144 blocks/day from Jan 3, 2009 (genesis). Accurate to ~1-2% which is
+# fine for visualising the supply curve trend.
+def _btc_supply_at(date_dt: datetime) -> float:
+    GENESIS = datetime(2009, 1, 3)
+    if date_dt <= GENESIS:
+        return 0.0
+    days = (date_dt - GENESIS).days
+    block_height = days * 144
+    # Sum subsidy for each epoch up to block_height
+    HALVING = 210_000
+    supply = 0.0
+    block = 0
+    epoch = 0
+    while block < block_height:
+        epoch_end = (epoch + 1) * HALVING
+        subsidy = 50.0 / (2 ** epoch)
+        blocks_this_epoch = min(epoch_end, block_height) - block
+        supply += blocks_this_epoch * subsidy
+        block = epoch_end
+        epoch += 1
+        if epoch >= 33:
+            break
+    return supply
+
+def _monthly_dates(start: datetime, end: datetime) -> List[datetime]:
+    out = []
+    cursor = start.replace(day=1)
+    while cursor <= end:
+        out.append(cursor)
+        if cursor.month == 12:
+            cursor = cursor.replace(year=cursor.year + 1, month=1)
+        else:
+            cursor = cursor.replace(month=cursor.month + 1)
+    return out
+
+def _index_to_base(series: List[Tuple[datetime, float]], base_dt: datetime, sample_dates: List[datetime]) -> List[Optional[float]]:
+    """Resample a series to sample_dates and rebase so the value at base_dt is 100."""
+    if not series:
+        return [None] * len(sample_dates)
+    base_value = _series_value_at_or_before(series, base_dt)
+    if not base_value:
+        # Try first value if base is before series start
+        base_value = series[0][1] if series else None
+    if not base_value:
+        return [None] * len(sample_dates)
+    out: List[Optional[float]] = []
+    for d in sample_dates:
+        v = _series_value_at_or_before(series, d)
+        out.append(round(v / base_value * 100.0, 2) if v else None)
+    return out
+
+@app.route('/api/debasement')
+def api_debasement():
+    """Combined fiat-debasement payload: money supply race, GBP purchasing
+    power decay, BTC supply curve, real BTC USD price."""
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / 'debasement_cache.json'
+        cached = _cached_json(cache_file, timedelta(hours=12))
+        if cached:
+            return jsonify(cached)
+
+        BASE_DT = datetime(2009, 1, 1)  # rebase year
+        END_DT = datetime.utcnow()
+        sample_dates = _monthly_dates(BASE_DT, END_DT)
+
+        # --- Money supply series ---
+        us_m2_full  = _fetch_fred_csv('M2SL', cache_dir)
+        # Fallback when FRED is unreachable (TLS quirks on some networks):
+        # World Bank annual "Broad money (current LCU)" for the USA.
+        us_m2_source = 'FRED M2SL'
+        if not us_m2_full:
+            us_m2_full = _fetch_worldbank_indicator('USA', 'FM.LBL.BMNY.CN', cache_dir)
+            if us_m2_full:
+                us_m2_source = 'World Bank FM.LBL.BMNY.CN (annual)'
+
+        eu_m3_full  = _fetch_ecb_m3(cache_dir)
+        uk_m4_full  = _fetch_boe_m4(cache_dir)
+        if not uk_m4_full:
+            uk_m4_full = _fetch_worldbank_indicator('GBR', 'FM.LBL.BMNY.CN', cache_dir)
+
+        us_m2_idx = _index_to_base(us_m2_full, BASE_DT, sample_dates)
+        eu_m3_idx = _index_to_base(eu_m3_full, BASE_DT, sample_dates)
+        uk_m4_idx = _index_to_base(uk_m4_full, BASE_DT, sample_dates)
+
+        # BTC supply: emit raw absolute values plus % of 21M cap. Skip
+        # "index to 2009" because supply was effectively zero then and the
+        # resulting percentage would be meaningless.
+        btc_supply_series = [_btc_supply_at(d) for d in sample_dates]
+        btc_supply_abs_m = [round(v / 1_000_000.0, 4) if v else None for v in btc_supply_series]
+        btc_supply_pct_cap = [round(v / 21_000_000.0 * 100.0, 2) if v else None for v in btc_supply_series]
+
+        # --- Latest values for headline stats ---
+        def latest(series: List[Tuple[datetime, float]]) -> Optional[Tuple[datetime, float]]:
+            return series[-1] if series else None
+        def base(series: List[Tuple[datetime, float]]) -> Optional[float]:
+            return _series_value_at_or_before(series, BASE_DT) or (series[0][1] if series else None)
+
+        def growth_pct(series: List[Tuple[datetime, float]]) -> Optional[float]:
+            lo = base(series)
+            hi = latest(series)
+            if lo and hi and lo > 0:
+                return round((hi[1] / lo - 1.0) * 100.0, 1)
+            return None
+
+        # --- UK CPI: compound annual rates from 2009 to today ---
+        cpi_rates = _fetch_uk_cpi_annual(cache_dir)
+        current_year = END_DT.year
+        gbp_power_series = []
+        cumulative = 1.0
+        for year in range(BASE_DT.year, current_year + 1):
+            rate = cpi_rates.get(year)
+            if rate is None and year == current_year:
+                # Final year not yet released; carry forward last
+                rate = cpi_rates.get(year - 1, 0.0)
+            if rate is None:
+                rate = 0.0
+            cumulative *= (1 + rate / 100.0)
+            gbp_power_series.append({
+                'year': year,
+                'price_multiplier': round(cumulative, 4),
+                'pound_buys': round(1.0 / cumulative, 4),
+            })
+        gbp_purchasing_power_now = round(1.0 / cumulative, 4) if cumulative else None
+
+        # --- Real BTC USD price (nominal / US CPI) ---
+        btc_usd = _load_btc_daily_usd_all(cache_dir)
+        real_btc_series = []
+        # Try FRED CPI; fall back to World Bank annual US CPI index
+        us_cpi = _fetch_fred_csv('CPIAUCSL', cache_dir)
+        if not us_cpi:
+            wb_cpi = _fetch_worldbank_indicator('USA', 'FP.CPI.TOTL', cache_dir)
+            us_cpi = wb_cpi
+        if btc_usd and us_cpi:
+            base_cpi = _series_value_at_or_before(us_cpi, BASE_DT)
+            if base_cpi:
+                btc_monthly = []
+                for d in sample_dates:
+                    p = _series_value_at_or_before(btc_usd, d)
+                    cpi = _series_value_at_or_before(us_cpi, d)
+                    if p and cpi:
+                        real = p * (base_cpi / cpi)
+                        btc_monthly.append([d.strftime('%Y-%m-%d'), round(p, 2), round(real, 2)])
+                real_btc_series = btc_monthly
+
+        # --- Build response ---
+        race_dates = [d.strftime('%Y-%m-%d') for d in sample_dates]
+
+        usd_m2_growth = growth_pct(us_m2_full)
+        eur_m3_growth = growth_pct(eu_m3_full)
+        gbp_m4_growth = growth_pct(uk_m4_full)
+        btc_supply_now = btc_supply_series[-1] if btc_supply_series else None
+        btc_supply_pct_now = round(btc_supply_now / 21_000_000.0 * 100.0, 2) if btc_supply_now else None
+
+        payload = {
+            'base_date': BASE_DT.strftime('%Y-%m-%d'),
+            'as_of': END_DT.strftime('%Y-%m-%d'),
+            'race': {
+                'dates': race_dates,
+                'usd_m2': us_m2_idx,
+                'eur_m3': eu_m3_idx,
+                'gbp_m4': uk_m4_idx,
+            },
+            'btc_supply': {
+                'dates': race_dates,
+                'absolute_millions': btc_supply_abs_m,
+                'pct_of_cap': btc_supply_pct_cap,
+                'cap_millions': 21,
+            },
+            'gbp_purchasing_power': {
+                'series': gbp_power_series,
+                'now': gbp_purchasing_power_now,  # what £1 from 2009 buys today
+            },
+            'real_btc': {
+                'series': real_btc_series,  # [date, nominal_usd, real_usd_2009]
+            },
+            'stats': {
+                'usd_m2_growth_pct_since_2009': usd_m2_growth,
+                'eur_m3_growth_pct_since_2009': eur_m3_growth,
+                'gbp_m4_growth_pct_since_2009': gbp_m4_growth,
+                'btc_supply_now': round(btc_supply_now, 0) if btc_supply_now else None,
+                'btc_supply_pct_of_cap_now': btc_supply_pct_now,
+                'gbp_purchasing_power_2009_in_today': gbp_purchasing_power_now,
+            },
+            'sources': {
+                'usd_m2': us_m2_source,
+                'eur_m3': 'ECB BSI M3 (U2)',
+                'gbp_m4': 'Bank of England LPMAUYM',
+                'uk_cpi': 'ONS D7G7 (annual % CPI)',
+                'us_cpi': 'FRED CPIAUCSL',
+                'btc_supply': 'Derived from halving schedule',
+                'btc_usd': 'blockchain.info market-price',
+            },
+        }
+        _write_cache(cache_file, payload)
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # --------------------------------------------------------------------------- #
 # Cycle dashboard — /cycles
