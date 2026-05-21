@@ -75,6 +75,10 @@ def bitcoin_for_humans():
 def priced_in_page():
     return render_template('priced-in.html')
 
+@app.route('/cycles')
+def cycles_page():
+    return render_template('cycles.html')
+
 @app.route('/api/nodes-latest')
 def nodes_latest():
     try:
@@ -765,6 +769,285 @@ def get_historical_data(range):
             except Exception:
                 pass
         return jsonify({'error': str(e)}), 502
+
+# --------------------------------------------------------------------------- #
+# Cycle dashboard — /cycles
+# --------------------------------------------------------------------------- #
+
+# Bitcoin halving dates. Block-number based; calendar dates verified vs known
+# blocks 210000 / 420000 / 630000 / 840000. The fifth entry is the projected
+# next halving derived from /api/onchain-supply at request time.
+HALVING_DATES = [
+    ('Cycle 1', datetime(2012, 11, 28)),  # block 210,000
+    ('Cycle 2', datetime(2016, 7,  9)),   # block 420,000
+    ('Cycle 3', datetime(2020, 5,  11)),  # block 630,000
+    ('Cycle 4', datetime(2024, 4,  19)),  # block 840,000
+]
+
+def _load_btc_daily_usd_all(cache_dir: Path) -> List[Tuple[datetime, float]]:
+    """Daily BTC/USD back to 2009 via blockchain.info market-price (sampled=false).
+    Cached 24h."""
+    cache_file = cache_dir / 'btc_daily_usd_all_cache.json'
+    cached = _cached_json(cache_file, timedelta(hours=24))
+    if cached and 'prices' in cached:
+        out: List[Tuple[datetime, float]] = []
+        for d, p in cached['prices']:
+            try:
+                out.append((datetime.fromisoformat(d), float(p)))
+            except Exception:
+                continue
+        if out:
+            return out
+    try:
+        r = requests.get(
+            'https://api.blockchain.info/charts/market-price',
+            params={'timespan': 'all', 'sampled': 'false', 'format': 'json', 'cors': 'true'},
+            timeout=45,
+        )
+        r.raise_for_status()
+        j = r.json()
+        result: List[Tuple[datetime, float]] = []
+        for pt in j.get('values', []):
+            try:
+                d = datetime.utcfromtimestamp(int(pt['x'])).replace(hour=0, minute=0, second=0, microsecond=0)
+                v = float(pt['y'])
+                if v > 0:
+                    result.append((d, v))
+            except Exception:
+                continue
+        if result:
+            _write_cache(cache_file, {'prices': [[d.isoformat(), p] for d, p in result]})
+        return result
+    except Exception:
+        return []
+
+def _sma(values: List[Optional[float]], window: int) -> List[Optional[float]]:
+    """Simple moving average. Skips Nones at the window boundary."""
+    out: List[Optional[float]] = [None] * len(values)
+    if window <= 0 or window > len(values):
+        return out
+    s = 0.0
+    valid = 0
+    from collections import deque
+    q: 'deque' = deque()
+    for i, v in enumerate(values):
+        if v is None:
+            q.append(None)
+        else:
+            q.append(v)
+            s += v
+            valid += 1
+        if len(q) > window:
+            old = q.popleft()
+            if old is not None:
+                s -= old
+                valid -= 1
+        if len(q) == window and valid > 0:
+            out[i] = s / valid
+    return out
+
+def _downsample_xy(pairs: List[Tuple[float, float]], max_points: int = 600) -> List[Tuple[float, float]]:
+    """Even-stride downsample. Keeps the last point exactly."""
+    if not pairs or len(pairs) <= max_points:
+        return pairs
+    step = max(1, len(pairs) // max_points)
+    out = [pairs[i] for i in range(0, len(pairs), step)]
+    if out[-1] != pairs[-1]:
+        out.append(pairs[-1])
+    return out
+
+@app.route('/api/cycle-data')
+def api_cycle_data():
+    """Cycle dashboard payload: halving overlay, Pi cycle, 200-week SMA,
+    Mayer multiple, current cycle position."""
+    try:
+        cache_dir = Path(__file__).parent / 'data'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / 'cycle_data_cache.json'
+        cached = _cached_json(cache_file, timedelta(hours=6))
+        if cached:
+            return jsonify(cached)
+
+        series = _load_btc_daily_usd_all(cache_dir)
+        if not series:
+            return jsonify({'error': 'history unavailable'}), 502
+
+        # Build a date -> price map for O(1) lookup later
+        date_to_price = {d.date(): p for d, p in series}
+        dates_sorted = [d for d, _ in series]
+        prices_sorted = [p for _, p in series]
+        last_date, last_price = series[-1]
+
+        # ---------- Halving overlay ----------
+        cycles_out = []
+        for i, (label, halving_dt) in enumerate(HALVING_DATES):
+            next_halving = HALVING_DATES[i + 1][1] if i + 1 < len(HALVING_DATES) else None
+            end_dt = next_halving if next_halving else last_date
+
+            # Find halving-day price (use first data point >= halving_dt)
+            start_price = None
+            for d, p in series:
+                if d >= halving_dt:
+                    start_price = p
+                    break
+            if not start_price:
+                continue
+
+            # Build (day_offset, pct_gain_x) series
+            cycle_pts: List[Tuple[float, float]] = []
+            for d, p in series:
+                if d < halving_dt:
+                    continue
+                if d > end_dt:
+                    break
+                day_offset = (d - halving_dt).days
+                cycle_pts.append((day_offset, p / start_price))
+
+            cycle_pts = _downsample_xy(cycle_pts, 400)
+
+            cycles_out.append({
+                'label': label,
+                'halving_date': halving_dt.strftime('%Y-%m-%d'),
+                'halving_price_usd': round(start_price, 2),
+                'is_current': i == len(HALVING_DATES) - 1,
+                'series': [[round(x, 1), round(y, 4)] for x, y in cycle_pts],
+            })
+
+        # ---------- Pi cycle (over last ~6 years, daily) ----------
+        recent_cutoff = last_date - timedelta(days=6 * 365 + 30)
+        # Index of first point in the recent window — use it as a lower bound
+        first_recent_idx = 0
+        for idx, d in enumerate(dates_sorted):
+            if d >= recent_cutoff:
+                first_recent_idx = idx
+                break
+
+        # Need 350 days of context before the recent window for the SMA to be valid
+        context_idx = max(0, first_recent_idx - 360)
+        ctx_dates = dates_sorted[context_idx:]
+        ctx_prices = prices_sorted[context_idx:]
+        ma111 = _sma(ctx_prices, 111)
+        ma350 = _sma(ctx_prices, 350)
+        ma350_x2 = [v * 2 if v is not None else None for v in ma350]
+
+        # Trim back to the recent window for the response
+        trim_offset = first_recent_idx - context_idx
+        recent_dates = ctx_dates[trim_offset:]
+        recent_prices = ctx_prices[trim_offset:]
+        ma111_r = ma111[trim_offset:]
+        ma350x2_r = ma350_x2[trim_offset:]
+
+        # Downsample the Pi cycle arrays (max ~600 points)
+        pi_pairs = list(zip(recent_dates, recent_prices, ma111_r, ma350x2_r))
+        if len(pi_pairs) > 800:
+            step = max(1, len(pi_pairs) // 800)
+            pi_pairs = [pi_pairs[i] for i in range(0, len(pi_pairs), step)] + [pi_pairs[-1]]
+
+        pi_payload = {
+            'dates':      [d.strftime('%Y-%m-%d') for d, _, _, _ in pi_pairs],
+            'price':      [round(p, 2) if p is not None else None for _, p, _, _ in pi_pairs],
+            'ma_111':     [round(v, 2) if v is not None else None for _, _, v, _ in pi_pairs],
+            'ma_350_x2':  [round(v, 2) if v is not None else None for _, _, _, v in pi_pairs],
+        }
+
+        # Latest Pi cycle status
+        latest_111 = next((v for v in reversed(ma111) if v is not None), None)
+        latest_350x2 = next((v for v in reversed(ma350_x2) if v is not None), None)
+        if latest_111 is not None and latest_350x2 is not None:
+            pi_status = {
+                'ma_111': round(latest_111, 2),
+                'ma_350_x2': round(latest_350x2, 2),
+                'crossed_above': latest_111 > latest_350x2,
+                'gap_pct': round(((latest_111 / latest_350x2) - 1.0) * 100.0, 2),
+            }
+        else:
+            pi_status = None
+
+        # ---------- 200-week SMA (=1400-day SMA) ----------
+        # Need 1400 days of context. Use the full series for the SMA, then trim to recent.
+        wma_window = 1400
+        ma_200w_full = _sma(prices_sorted, wma_window)
+        # Trim to recent ~4 years
+        wma_cutoff = last_date - timedelta(days=4 * 365 + 30)
+        wma_pairs = []
+        for d, p, w in zip(dates_sorted, prices_sorted, ma_200w_full):
+            if d >= wma_cutoff:
+                wma_pairs.append((d, p, w))
+        if len(wma_pairs) > 800:
+            step = max(1, len(wma_pairs) // 800)
+            wma_pairs = [wma_pairs[i] for i in range(0, len(wma_pairs), step)] + [wma_pairs[-1]]
+        wma_payload = {
+            'dates': [d.strftime('%Y-%m-%d') for d, _, _ in wma_pairs],
+            'price': [round(p, 2) if p is not None else None for _, p, _ in wma_pairs],
+            'ma_200w': [round(w, 2) if w is not None else None for _, _, w in wma_pairs],
+        }
+        latest_200w = next((v for v in reversed(ma_200w_full) if v is not None), None)
+        wma_status = None
+        if latest_200w is not None:
+            wma_status = {
+                'price': round(last_price, 2),
+                'ma_200w': round(latest_200w, 2),
+                'ratio': round(last_price / latest_200w, 3),
+                'distance_pct': round(((last_price / latest_200w) - 1.0) * 100.0, 2),
+            }
+
+        # ---------- Mayer multiple (200-day SMA based) ----------
+        ma200_full = _sma(prices_sorted, 200)
+        latest_ma200 = next((v for v in reversed(ma200_full) if v is not None), None)
+        mayer = round(last_price / latest_ma200, 3) if latest_ma200 else None
+
+        # ---------- Current cycle stats ----------
+        current_halving = HALVING_DATES[-1][1]
+        days_since_halving = (last_date - current_halving).days
+        # Project the next halving 4 years out (refined below if /api/onchain-supply tells us better)
+        next_halving_est = current_halving + timedelta(days=4 * 365 + 1)
+        days_to_next_halving = (next_halving_est - last_date).days
+
+        # Find halving-day price for current cycle
+        current_cycle_start_price = None
+        for d, p in series:
+            if d >= current_halving:
+                current_cycle_start_price = p
+                break
+        pct_since_halving = ((last_price / current_cycle_start_price) - 1.0) * 100.0 if current_cycle_start_price else None
+
+        # Historical cycle peak comparisons (raw % gain at the same day_offset)
+        historical_at_same_day = []
+        for entry in cycles_out:
+            if entry.get('is_current'):
+                continue
+            xs = entry.get('series', [])
+            same = next((y for x, y in xs if x >= days_since_halving), None)
+            historical_at_same_day.append({
+                'label': entry['label'],
+                'multiple': round(same, 2) if same else None,
+            })
+
+        current_cycle = {
+            'halving_date': current_halving.strftime('%Y-%m-%d'),
+            'next_halving_estimate': next_halving_est.strftime('%Y-%m-%d'),
+            'days_since_halving': days_since_halving,
+            'days_to_next_halving': days_to_next_halving,
+            'cycle_progress_pct': round(min(100.0, days_since_halving / (4 * 365.25) * 100.0), 1),
+            'current_price_usd': round(last_price, 2),
+            'cycle_start_price_usd': round(current_cycle_start_price, 2) if current_cycle_start_price else None,
+            'pct_gain_since_halving': round(pct_since_halving, 1) if pct_since_halving is not None else None,
+            'historical_at_same_day': historical_at_same_day,
+        }
+
+        payload = {
+            'cycles': cycles_out,
+            'pi_cycle': {'series': pi_payload, 'status': pi_status},
+            'two_hundred_wma': {'series': wma_payload, 'status': wma_status},
+            'mayer_multiple': mayer,
+            'current_cycle': current_cycle,
+            'as_of': last_date.strftime('%Y-%m-%d'),
+            'source': 'blockchain.info market-price',
+        }
+        _write_cache(cache_file, payload)
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # --------------------------------------------------------------------------- #
 # Saver's view — /priced-in

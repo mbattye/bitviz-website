@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cycle dashboard — BitViz</title>
+    <meta name="description" content="Where are we in this Bitcoin halving cycle? Overlays vs the last three cycles, Pi cycle indicator, 200-week SMA, Mayer multiple.">
+    <style>
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        .cycles-wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px 4rem;
+        }
+
+        /* Hero */
+        .cycles-hero {
+            padding: 3.5rem 0 2.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2.5rem;
+        }
+        .cycles-hero .eyebrow {
+            color: var(--brand);
+            font-size: 0.78rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+        .cycles-hero h1 {
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            line-height: 1.1;
+            margin: 0 0 0.75rem;
+            letter-spacing: -0.02em;
+            font-weight: 800;
+        }
+        .cycles-hero .lede {
+            color: var(--muted);
+            font-size: 1.05rem;
+            max-width: 720px;
+            margin: 0 0 2rem;
+        }
+
+        /* Progress bar */
+        .cycle-progress-wrap {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 22px 24px;
+        }
+        .cpw-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .cpw-row .label {
+            color: var(--muted);
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .cpw-row .value {
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+        }
+        .cpw-row .value.big {
+            font-size: 1.6rem;
+            color: var(--brand);
+        }
+        .progress-track {
+            position: relative;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            height: 14px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 0;
+            background: linear-gradient(90deg, var(--brand), #ffb24d);
+            transition: width 0.8s ease;
+            border-radius: 999px;
+        }
+        .progress-axis {
+            display: flex;
+            justify-content: space-between;
+            color: var(--muted);
+            font-size: 0.75rem;
+            margin-top: 6px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .hero-stat-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-top: 1.5rem;
+        }
+        .hero-stat-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px 18px;
+        }
+        .hero-stat-card .hsc-label {
+            color: var(--muted);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .hero-stat-card .hsc-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+            line-height: 1.1;
+        }
+        .hero-stat-card .hsc-sub {
+            color: var(--muted);
+            font-size: 0.82rem;
+            margin-top: 4px;
+        }
+        .hero-stat-card.brand .hsc-value { color: var(--brand); }
+        .hero-stat-card.pos   .hsc-value { color: var(--positive); }
+        .hero-stat-card.neg   .hsc-value { color: var(--negative); }
+
+        /* Sections */
+        .cycles-section {
+            margin: 3rem 0;
+        }
+        .cycles-section h2 {
+            font-size: clamp(1.4rem, 3vw, 1.9rem);
+            margin: 0 0 0.5rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+        .cycles-section .section-blurb {
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.65;
+            max-width: 800px;
+            margin: 0 0 1.5rem;
+        }
+
+        .chart-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: clamp(16px, 2.5vw, 24px);
+            position: relative;
+        }
+        .chart-card .chart-meta-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .chart-card .legend {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .legend-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82rem;
+            color: var(--muted);
+            background: var(--bg);
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+        }
+        .legend-pill .swatch {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+        }
+        .legend-pill.current {
+            color: var(--text);
+            border-color: var(--brand);
+        }
+        .chart-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+        }
+        .chart-status .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+        .chart-status.green { color: var(--positive); border-color: var(--positive); }
+        .chart-status.green .dot { background: var(--positive); }
+        .chart-status.orange { color: var(--brand); border-color: var(--brand); }
+        .chart-status.orange .dot { background: var(--brand); }
+        .chart-status.red { color: var(--negative); border-color: var(--negative); }
+        .chart-status.red .dot { background: var(--negative); }
+
+        .chart-canvas-wrap {
+            position: relative;
+            width: 100%;
+            height: clamp(280px, 50vh, 480px);
+            margin-top: 8px;
+        }
+        .chart-canvas-wrap canvas { width: 100% !important; height: 100% !important; display: block; }
+        .chart-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            font-size: 0.9rem;
+            pointer-events: none;
+        }
+        .chart-loader.hidden { display: none; }
+
+        .chart-footnote {
+            color: var(--muted);
+            font-size: 0.85rem;
+            line-height: 1.55;
+            margin: 14px 0 0;
+        }
+
+        /* Cohort comparison cards */
+        .cohort-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 1.5rem;
+        }
+        .cohort-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .cohort-card .cc-label {
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .cohort-card .cc-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            margin: 4px 0 2px;
+        }
+        .cohort-card .cc-sub {
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+        .cohort-card.now { border-color: var(--brand); background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 12%, var(--bg)), var(--bg)); }
+        .cohort-card.now .cc-value { color: var(--brand); }
+
+        /* Closing */
+        .cycles-closing {
+            text-align: center;
+            padding: 3rem 0 1rem;
+        }
+        .cycles-closing h3 {
+            font-size: clamp(1.4rem, 3vw, 2rem);
+            margin: 0 0 1rem;
+        }
+        .cycles-closing p {
+            color: var(--muted);
+            max-width: 540px;
+            margin: 0 auto 1.5rem;
+        }
+        .cycles-closing .cta-row {
+            display: inline-flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .cycles-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 18px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+        }
+        .cycles-cta:hover { border-color: var(--brand); color: var(--brand); transform: translateY(-2px); }
+        .cycles-cta.primary { background: var(--brand); color: #0f172a; border-color: var(--brand); }
+        .cycles-cta.primary:hover { color: #0f172a; opacity: 0.92; }
+
+        @media (max-width: 720px) {
+            .cycles-wrap { padding: 0 16px 3rem; }
+            .cycles-hero { padding: 2.5rem 0 1.5rem; }
+            .chart-canvas-wrap { height: clamp(240px, 60vw, 360px); }
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/_header.html' %}
+
+    <article class="cycles-wrap">
+        <header class="cycles-hero">
+            <div class="eyebrow">Cycle dashboard</div>
+            <h1>Where are we in this Bitcoin cycle?</h1>
+            <p class="lede">
+                Bitcoin's price has historically followed a four-year rhythm anchored to the halving. The chart below
+                overlays the current cycle on the previous three, day-for-day from the halving — so you can see whether
+                this run is hot, cold, or in step with history.
+            </p>
+
+            <div class="cycle-progress-wrap">
+                <div class="cpw-row">
+                    <div>
+                        <div class="label">Days since latest halving</div>
+                        <div class="value big" id="ccDaysSince">—</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="label">Next halving (estimate)</div>
+                        <div class="value" id="ccNextHalving">—</div>
+                    </div>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="ccProgressFill"></div>
+                </div>
+                <div class="progress-axis">
+                    <span id="ccHalvingDate">halving</span>
+                    <span>halfway</span>
+                    <span id="ccNextHalvingShort">next halving</span>
+                </div>
+
+                <div class="hero-stat-row">
+                    <div class="hero-stat-card brand">
+                        <div class="hsc-label">Current spot</div>
+                        <div class="hsc-value" id="ccPrice">—</div>
+                        <div class="hsc-sub" id="ccPriceSub">daily close</div>
+                    </div>
+                    <div class="hero-stat-card pos">
+                        <div class="hsc-label">Gain since halving</div>
+                        <div class="hsc-value" id="ccGain">—</div>
+                        <div class="hsc-sub" id="ccStartPrice">started —</div>
+                    </div>
+                    <div class="hero-stat-card">
+                        <div class="hsc-label">Cycle progress</div>
+                        <div class="hsc-value" id="ccProgressPct">—</div>
+                        <div class="hsc-sub">of the ~4-year cycle</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- HALVING OVERLAY -->
+        <section class="cycles-section">
+            <h2>Halving overlay — this cycle vs the previous three</h2>
+            <p class="section-blurb">
+                Each line below starts at <strong>1×</strong> on the halving day and tracks the multiple from there.
+                Y-axis is logarithmic — equal vertical distances mean equal % gains. The current cycle is highlighted
+                in orange.
+            </p>
+            <div class="chart-card">
+                <div class="chart-meta-row">
+                    <div class="legend" id="overlayLegend"></div>
+                </div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="overlayChart"></canvas>
+                    <div class="chart-loader" id="overlayLoader">Loading…</div>
+                </div>
+                <p class="chart-footnote">
+                    Source: blockchain.info daily market price (USD). Days are zero-indexed from each halving.
+                    Earlier cycles' starting price: <span id="overlayStarts">—</span>.
+                </p>
+            </div>
+
+            <h3 style="font-size:1rem; margin: 1.75rem 0 0.5rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; font-weight:600;">At the same day in past cycles</h3>
+            <div class="cohort-grid" id="cohortGrid"></div>
+        </section>
+
+        <!-- PI CYCLE -->
+        <section class="cycles-section">
+            <h2>Pi cycle top indicator</h2>
+            <p class="section-blurb">
+                When the <strong>111-day SMA</strong> crosses above <strong>2× the 350-day SMA</strong>, it has historically
+                marked the top of the cycle within a few days — true for 2013, 2017 and 2021. A wide negative gap means
+                we're nowhere near a top. A narrow or positive gap is a flashing light.
+            </p>
+            <div class="chart-card">
+                <div class="chart-meta-row">
+                    <div class="legend">
+                        <span class="legend-pill"><span class="swatch" style="background:var(--text)"></span>BTC price</span>
+                        <span class="legend-pill"><span class="swatch" style="background:var(--accent)"></span>111-day SMA</span>
+                        <span class="legend-pill"><span class="swatch" style="background:var(--brand)"></span>2 × 350-day SMA</span>
+                    </div>
+                    <div class="chart-status" id="piStatus"><span class="dot"></span><span id="piStatusText">—</span></div>
+                </div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="piChart"></canvas>
+                    <div class="chart-loader" id="piLoader">Loading…</div>
+                </div>
+                <p class="chart-footnote" id="piFootnote">
+                    Gap between the moving averages is shown below the chart. Negative = 111d SMA below 2× 350d SMA (no top signal).
+                </p>
+            </div>
+        </section>
+
+        <!-- 200-WEEK SMA -->
+        <section class="cycles-section">
+            <h2>200-week moving average</h2>
+            <p class="section-blurb">
+                Across Bitcoin's history, prices have rarely closed below their 200-week (1400-day) moving average.
+                When they have, it has tended to coincide with cycle <em>bottoms</em>. The current ratio tells you how
+                hot or cold price is relative to its longest meaningful trend.
+            </p>
+            <div class="chart-card">
+                <div class="chart-meta-row">
+                    <div class="legend">
+                        <span class="legend-pill"><span class="swatch" style="background:var(--text)"></span>BTC price</span>
+                        <span class="legend-pill"><span class="swatch" style="background:var(--brand)"></span>200-week SMA</span>
+                    </div>
+                    <div class="chart-status" id="wmaStatus"><span class="dot"></span><span id="wmaStatusText">—</span></div>
+                </div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="wmaChart"></canvas>
+                    <div class="chart-loader" id="wmaLoader">Loading…</div>
+                </div>
+                <p class="chart-footnote">
+                    Below 1.0× the 200-week SMA is historically the rarest part of the cycle and the best risk/reward zone.
+                    Mayer Multiple (price ÷ 200-day SMA): <strong id="mayerVal">—</strong>.
+                </p>
+            </div>
+        </section>
+
+        <footer class="cycles-closing">
+            <h3>Indicators are maps, not crystal balls</h3>
+            <p>
+                Every cycle so far has rhymed; none has repeated exactly. Past patterns are useful for positioning
+                attention, not for guaranteeing outcomes.
+            </p>
+            <div class="cta-row">
+                <a class="cycles-cta primary" href="/bitcoin-metrics">Open the metrics dashboard →</a>
+                <a class="cycles-cta" href="/bitcoin-for-humans">Read the story</a>
+            </div>
+        </footer>
+    </article>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+    (function(){
+        const CYCLE_COLOURS = ['#94a3b8', '#fbbf24', '#38bdf8', '#f7931a']; // past → current
+        const fmtMult = v => v == null ? '—' : v.toFixed(v < 10 ? 2 : 1) + '×';
+        const fmtPct = v => v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+        const fmtDate = s => {
+            if (!s) return '—';
+            const d = new Date(s);
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        };
+
+        // Currency helpers: cycle data is sourced in USD from blockchain.info.
+        // We convert via the live GBP/USD rate maintained by the shared header
+        // partial (window.BV) so this page honours the global currency switcher.
+        function ccy() { return (window.BV && BV.fx && BV.fx.mode === 'GBP') ? 'GBP' : 'USD'; }
+        function fxRate() { return (window.BV && BV.fx && BV.fx.gbp_per_usd) || 0.78; }
+        function convertUsd(value) {
+            if (value == null) return null;
+            return ccy() === 'GBP' ? value * fxRate() : value;
+        }
+        function symbol() { return ccy() === 'GBP' ? '£' : '$'; }
+        function fmtCcyFromUsd(usdValue) {
+            const v = convertUsd(usdValue);
+            if (v == null) return symbol() + '—';
+            const locale = ccy() === 'GBP' ? 'en-GB' : 'en-US';
+            return symbol() + Number(v).toLocaleString(locale, { maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 });
+        }
+
+        function cssVar(name, fallback) {
+            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return v || fallback;
+        }
+
+        function statusFor(value, thresholds, labels) {
+            // thresholds: [low, high]; labels: { low, mid, high }
+            if (value == null) return { tone: '', text: '—' };
+            if (value < thresholds[0]) return { tone: 'green', text: labels.low };
+            if (value > thresholds[1]) return { tone: 'red',   text: labels.high };
+            return { tone: 'orange', text: labels.mid };
+        }
+
+        function setStatus(elId, statusEl, value, classKey) {
+            const wrap = document.getElementById(elId);
+            const txt  = document.getElementById(elId + 'Text');
+            if (!wrap || !txt) return;
+            wrap.classList.remove('green','orange','red');
+            if (value.tone) wrap.classList.add(value.tone);
+            txt.textContent = value.text;
+        }
+
+        // Module-scope state so currency-toggle re-renders can reuse data + tear down charts
+        let cycleData = null;
+        let overlayChartInstance = null;
+        let piChartInstance = null;
+        let wmaChartInstance = null;
+
+        async function loadCycleData() {
+            const r = await fetch('/api/cycle-data');
+            if (!r.ok) throw new Error('cycle-data HTTP ' + r.status);
+            return r.json();
+        }
+
+        function renderHero(data) {
+            const cc = data.current_cycle || {};
+            document.getElementById('ccDaysSince').textContent = (cc.days_since_halving ?? '—').toLocaleString();
+            document.getElementById('ccNextHalving').textContent = fmtDate(cc.next_halving_estimate);
+            document.getElementById('ccNextHalvingShort').textContent = fmtDate(cc.next_halving_estimate);
+            document.getElementById('ccHalvingDate').textContent = fmtDate(cc.halving_date);
+            document.getElementById('ccPrice').textContent = fmtCcyFromUsd(cc.current_price_usd);
+            document.getElementById('ccStartPrice').textContent = 'started ' + fmtCcyFromUsd(cc.cycle_start_price_usd);
+            const gain = cc.pct_gain_since_halving;
+            const gainEl = document.getElementById('ccGain');
+            gainEl.textContent = fmtPct(gain);
+            const gainCard = gainEl.closest('.hero-stat-card');
+            gainCard.classList.remove('pos','neg');
+            if (gain != null) gainCard.classList.add(gain >= 0 ? 'pos' : 'neg');
+            const pct = cc.cycle_progress_pct || 0;
+            document.getElementById('ccProgressPct').textContent = pct.toFixed(0) + '%';
+            document.getElementById('ccProgressFill').style.width = Math.min(100, pct) + '%';
+        }
+
+        function renderCohorts(data) {
+            const cc = data.current_cycle || {};
+            const grid = document.getElementById('cohortGrid');
+            grid.innerHTML = '';
+            (cc.historical_at_same_day || []).forEach(h => {
+                const div = document.createElement('div');
+                div.className = 'cohort-card';
+                div.innerHTML = `
+                    <div class="cc-label">${h.label}</div>
+                    <div class="cc-value">${fmtMult(h.multiple)}</div>
+                    <div class="cc-sub">at day ${cc.days_since_halving}</div>
+                `;
+                grid.appendChild(div);
+            });
+            const now = document.createElement('div');
+            now.className = 'cohort-card now';
+            const mult = cc.pct_gain_since_halving != null ? 1 + cc.pct_gain_since_halving / 100 : null;
+            now.innerHTML = `
+                <div class="cc-label">This cycle (now)</div>
+                <div class="cc-value">${fmtMult(mult)}</div>
+                <div class="cc-sub">at day ${cc.days_since_halving}</div>
+            `;
+            grid.appendChild(now);
+        }
+
+        function renderOverlayChart(data) {
+            if (overlayChartInstance) { overlayChartInstance.destroy(); overlayChartInstance = null; }
+            const ctx = document.getElementById('overlayChart');
+            const legendEl = document.getElementById('overlayLegend');
+            legendEl.innerHTML = '';
+
+            const datasets = (data.cycles || []).map((c, i) => {
+                const colour = CYCLE_COLOURS[i] || cssVar('--muted', '#94a3b8');
+                const isCurrent = !!c.is_current;
+                legendEl.innerHTML += `<span class="legend-pill ${isCurrent ? 'current' : ''}">
+                    <span class="swatch" style="background:${colour}"></span>
+                    ${c.label} · ${c.halving_date}
+                </span>`;
+                return {
+                    label: c.label,
+                    data: (c.series || []).map(([x, y]) => ({ x, y })),
+                    borderColor: colour,
+                    backgroundColor: isCurrent ? colour + '33' : 'transparent',
+                    borderWidth: isCurrent ? 2.8 : 1.6,
+                    pointRadius: 0,
+                    fill: isCurrent,
+                    tension: 0.05,
+                };
+            });
+
+            // Footnote with start prices (converted to active currency)
+            document.getElementById('overlayStarts').textContent =
+                (data.cycles || []).map(c => `${c.label} ${fmtCcyFromUsd(c.halving_price_usd)}`).join(' · ');
+
+            overlayChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    parsing: false,
+                    interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: cssVar('--panel', '#1e293b'),
+                            titleColor: cssVar('--text', '#e2e8f0'),
+                            bodyColor: cssVar('--text', '#e2e8f0'),
+                            borderColor: cssVar('--brand', '#f7931a'),
+                            borderWidth: 1,
+                            callbacks: {
+                                title: items => 'Day ' + items[0].parsed.x,
+                                label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(2)}×`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Days since halving', color: cssVar('--muted', '#94a3b8') },
+                            grid: { color: cssVar('--grid', 'rgba(148,163,184,0.1)') },
+                            ticks: { color: cssVar('--muted', '#94a3b8') }
+                        },
+                        y: {
+                            type: 'logarithmic',
+                            title: { display: true, text: 'Multiple from halving day', color: cssVar('--muted', '#94a3b8') },
+                            grid: { color: cssVar('--grid', 'rgba(148,163,184,0.1)') },
+                            ticks: {
+                                color: cssVar('--muted', '#94a3b8'),
+                                callback: v => v + '×'
+                            }
+                        }
+                    }
+                }
+            });
+            document.getElementById('overlayLoader').classList.add('hidden');
+        }
+
+        function renderPiChart(data) {
+            if (piChartInstance) { piChartInstance.destroy(); piChartInstance = null; }
+            const series = data.pi_cycle && data.pi_cycle.series;
+            const status = data.pi_cycle && data.pi_cycle.status;
+            if (!series) return;
+
+            const ctx = document.getElementById('piChart');
+            // Convert USD series to active currency
+            const conv = arr => (arr || []).map(v => v == null ? null : convertUsd(v));
+            const ds = (label, arr, colour, width) => ({
+                label, data: conv(arr), borderColor: colour, borderWidth: width,
+                pointRadius: 0, tension: 0.05, fill: false, spanGaps: true
+            });
+
+            piChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: series.dates,
+                    datasets: [
+                        ds('BTC price',     series.price,     cssVar('--text', '#e2e8f0'),   1.6),
+                        ds('111d SMA',      series.ma_111,    cssVar('--accent', '#38bdf8'), 2.0),
+                        ds('2 × 350d SMA',  series.ma_350_x2, cssVar('--brand', '#f7931a'),  2.0),
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: cssVar('--panel', '#1e293b'),
+                            titleColor: cssVar('--text', '#e2e8f0'),
+                            bodyColor: cssVar('--text', '#e2e8f0'),
+                            borderColor: cssVar('--brand', '#f7931a'),
+                            borderWidth: 1,
+                            callbacks: {
+                                // item.parsed.y is already in the active currency (we converted on dataset build)
+                                label: (item) => {
+                                    const v = item.parsed.y;
+                                    const locale = ccy() === 'GBP' ? 'en-GB' : 'en-US';
+                                    return `${item.dataset.label}: ${symbol()}${Number(v).toLocaleString(locale, { maximumFractionDigits: 0 })}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'category',
+                            ticks: {
+                                color: cssVar('--muted', '#94a3b8'),
+                                maxTicksLimit: 8,
+                                callback: function(v) {
+                                    const lbl = this.getLabelForValue(v);
+                                    return lbl ? lbl.slice(0, 7) : '';
+                                }
+                            },
+                            grid: { color: cssVar('--grid', 'rgba(148,163,184,0.1)') }
+                        },
+                        y: {
+                            type: 'logarithmic',
+                            ticks: {
+                                color: cssVar('--muted', '#94a3b8'),
+                                callback: v => symbol() + Number(v).toLocaleString(ccy() === 'GBP' ? 'en-GB' : 'en-US', { maximumFractionDigits: 0 })
+                            },
+                            grid: { color: cssVar('--grid', 'rgba(148,163,184,0.1)') }
+                        }
+                    }
+                }
+            });
+
+            // Pi status pill (gap is a ratio, currency-invariant)
+            if (status) {
+                const tone = status.crossed_above ? 'red'
+                           : status.gap_pct > -20 ? 'orange'
+                           : 'green';
+                const text = status.crossed_above
+                    ? `Crossed — top signal · 111d ${fmtPct(status.gap_pct)} above 2×350d`
+                    : status.gap_pct > -20
+                        ? `Close · 111d ${fmtPct(status.gap_pct)} vs 2×350d`
+                        : `No signal · 111d ${fmtPct(status.gap_pct)} vs 2×350d`;
+                setStatus('piStatus', null, { tone, text });
+            }
+            document.getElementById('piLoader').classList.add('hidden');
+        }
+
+        function renderAll() {
+            if (!cycleData) return;
+            renderHero(cycleData);
+            renderCohorts(cycleData);
+            renderOverlayChart(cycleData);
+            renderPiChart(cycleData);
+            renderWmaChart(cycleData);
+        }
+
+        function renderWmaChart(data) {
+            if (wmaChartInstance) { wmaChartInstance.destroy(); wmaChartInstance = null; }
+            const series = data.two_hundred_wma && data.two_hundred_wma.series;
+            const status = data.two_hundred_wma && data.two_hundred_wma.status;
+            if (!series) return;
+
+            const ctx = document.getElementById('wmaChart');
+            const conv = arr => (arr || []).map(v => v == null ? null : convertUsd(v));
+            const ds = (label, arr, colour, width, fill) => ({
+                label, data: conv(arr), borderColor: colour, borderWidth: width,
+                backgroundColor: fill, pointRadius: 0, tension: 0.05, fill: !!fill, spanGaps: true
+            });
+
+            wmaChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: series.dates,
+                    datasets: [
+                        ds('BTC price',    series.price,   cssVar('--text', '#e2e8f0'),  1.6, null),
+                        ds('200-week SMA', series.ma_200w, cssVar('--brand', '#f7931a'), 2.2, 'rgba(247,147,26,0.10)'),
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: cssVar('--panel', '#1e293b'),
+                            titleColor: cssVar('--text', '#e2e8f0'),
+                            bodyColor: cssVar('--text', '#e2e8f0'),
+                            borderColor: cssVar('--brand', '#f7931a'),
+                            borderWidth: 1,
+                            callbacks: {
+                                label: (item) => {
+                                    const v = item.parsed.y;
+                                    const locale = ccy() === 'GBP' ? 'en-GB' : 'en-US';
+                                    return `${item.dataset.label}: ${symbol()}${Number(v).toLocaleString(locale, { maximumFractionDigits: 0 })}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'category',
+                            ticks: {
+                                color: cssVar('--muted', '#94a3b8'),
+                                maxTicksLimit: 8,
+                                callback: function(v) {
+                                    const lbl = this.getLabelForValue(v);
+                                    return lbl ? lbl.slice(0, 7) : '';
+                                }
+                            },
+                            grid: { color: cssVar('--grid', 'rgba(148,163,184,0.1)') }
+                        },
+                        y: {
+                            type: 'logarithmic',
+                            ticks: {
+                                color: cssVar('--muted', '#94a3b8'),
+                                callback: v => symbol() + Number(v).toLocaleString(ccy() === 'GBP' ? 'en-GB' : 'en-US', { maximumFractionDigits: 0 })
+                            },
+                            grid: { color: cssVar('--grid', 'rgba(148,163,184,0.1)') }
+                        }
+                    }
+                }
+            });
+
+            if (status) {
+                const ratio = status.ratio;
+                const tone = ratio < 1   ? 'green'
+                           : ratio < 2.4 ? 'orange'
+                           : 'red';
+                const text = `${ratio.toFixed(2)}× the 200-week SMA · ${fmtPct(status.distance_pct)}`;
+                setStatus('wmaStatus', null, { tone, text });
+            }
+
+            // Mayer value
+            document.getElementById('mayerVal').textContent = data.mayer_multiple != null ? data.mayer_multiple.toFixed(2) : '—';
+            document.getElementById('wmaLoader').classList.add('hidden');
+        }
+
+        async function init() {
+            try {
+                // Make sure FX is loaded so conversions are accurate before first paint
+                if (window.BV && BV.fetchFx) await BV.fetchFx().catch(() => {});
+                cycleData = await loadCycleData();
+                renderAll();
+                // Repaint everything when the global currency switcher fires
+                window.addEventListener('bv:currency-change', renderAll);
+            } catch (err) {
+                console.error('cycles init failed', err);
+                ['overlayLoader','piLoader','wmaLoader'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = 'Failed to load cycle data.';
+                });
+            }
+        }
+        init();
+    })();
+    </script>
+</body>
+</html>
